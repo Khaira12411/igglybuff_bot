@@ -8,7 +8,13 @@ import discord
 from discord.ext import commands
 
 from cogs.promo_refresher import promo_cache  # 🎀 Import existing promo cache
-from config.constants import FISH_COLOR, HUNT_CHANNEL_ID, PARFAIT_ROLE_ID, POKEMEOW_ID
+from config.constants import (
+    DONATED_ROLE_ID,
+    FISH_COLOR,
+    HERSHEY_ROLE_ID,
+    HUNT_CHANNEL_ID,
+    POKEMEOW_ID,
+)
 from config.emojis import Emojis
 from utils.record_drop import record_item_drop
 from utils.set_promo_db import get_promo
@@ -43,7 +49,7 @@ class EventWatcher(commands.Cog):
         promo = promo_cache.promo
         await self.process_npc_drops(message, promo)
 
-    # 💌 Handle edited messages for parfait drops
+    # 💌 Handle edited messages for hershey drops
     async def handle_edit_message(self, message: discord.Message):
         print(
             f"🎀 [EVENT WATCHER] on_message_edit from {message.author} (ID: {message.author.id})"
@@ -55,11 +61,11 @@ class EventWatcher(commands.Cog):
         print("✨ [EDIT WATCHER] Processing PokéMeow edited message...")
 
         if not promo_cache.is_promo_active():
-            print("💤 [SKIP] No active promo, skipping parfait drop check.")
+            print("💤 [SKIP] No active promo, skipping hershey drop check.")
             return
 
         promo = promo_cache.promo
-        await self.process_parfait_drops(message, promo)
+        await self.process_hershey_drops(message, promo)
 
     # 🎯 Process battle messages to possibly award NPC plushie drops
     async def process_npc_drops(self, message: discord.Message, promo: Dict[str, Any]):
@@ -83,9 +89,11 @@ class EventWatcher(commands.Cog):
                 print(f"⚠️ [WARN] Member '{username}' not found in guild.")
                 return
 
-            parfait_role = discord.utils.get(member.roles, id=PARFAIT_ROLE_ID)
-            if not parfait_role:
-                print(f"💤 [SKIP] Member {member} lacks parfait role.")
+            hershey_role = discord.utils.get(member.roles, id=HERSHEY_ROLE_ID)
+            donated_role = discord.utils.get(member.roles, id=DONATED_ROLE_ID)
+
+            if not hershey_role or not donated_role:
+                print(f"💤 [SKIP] Member {member} lacks required role.")
                 return
             promo_emoji = promo["emoji"]
             promo_name = promo["name"]
@@ -109,12 +117,12 @@ class EventWatcher(commands.Cog):
                 )
                 await hunt_channel.send(embed=drop_track_embed)
 
-    # 🎯 Process parfait reply messages to check for fish or catch plushie drops
-    async def process_parfait_drops(
+    # 🎯 Process hershey reply messages to check for fish or catch plushie drops
+    async def process_hershey_drops(
         self, message: discord.Message, promo: Dict[str, Any]
     ):
         if not message.guild or not message.reference:
-            print("💤 [SKIP] No guild or missing message reference for parfait drop.")
+            print("💤 [SKIP] No guild or missing message reference for hershey drop.")
             return
 
         try:
@@ -131,9 +139,11 @@ class EventWatcher(commands.Cog):
             print("💤 [SKIP] Replied member not found in guild.")
             return
 
-        parfait_role = discord.utils.get(member.roles, id=PARFAIT_ROLE_ID)
-        if not parfait_role:
-            print("💤 [SKIP] Member lacks parfait role.")
+        hershey_role = discord.utils.get(member.roles, id=HERSHEY_ROLE_ID)
+        donated_role = discord.utils.get(member.roles, id=DONATED_ROLE_ID)
+
+        if not hershey_role or not donated_role:
+            print("💤 [SKIP] Member lacks required roles.")
             return
 
         if message.embeds:
@@ -183,7 +193,7 @@ class EventWatcher(commands.Cog):
                         promo_emoji_name=promo_emoji_name,
                         promo_name=promo_name,
                     )
-                await hunt_channel.send(embed=drop_track_embed)
+                    await hunt_channel.send(embed=drop_track_embed)
 
     # 🎀 Discord event listener for new messages
     @commands.Cog.listener()
