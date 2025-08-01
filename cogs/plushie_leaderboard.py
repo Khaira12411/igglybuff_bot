@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import discord
@@ -11,6 +11,27 @@ from utils.daily_winner_db import get_top_daily_drops, get_top_drops_in_range
 ASIA_MANILA = ZoneInfo("Asia/Manila")
 STAFF_ROLE_ID = STAFF_ROLE_ID  # 🔐 Replace with your actual staff role ID
 from cogs.promo_refresher import get_active_promo_cache
+
+
+def get_reset_time_note():
+    now = datetime.now(tz=ASIA_MANILA)
+    # Calculate next reset time (12 PM today or tomorrow if past 12 PM)
+    reset_time = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    if now >= reset_time:
+        reset_time += timedelta(days=1)
+    # Format nicely for user display, e.g. "Aug 2, 12:00 PM"
+    formatted = reset_time.strftime("%b %d, %I:%M %p")
+    return f"*Stats reset at {formatted} Asia/Manila*"
+
+
+def get_reset_time_note():
+    now = datetime.now(tz=ASIA_MANILA)
+    reset_time = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    if now >= reset_time:
+        reset_time += timedelta(days=1)
+    unix_ts = int(reset_time.timestamp())
+    # Format with Discord's timestamp markdown, showing absolute and relative time
+    return f"Stats reset <t:{unix_ts}:f> (<t:{unix_ts}:R>) Asia/Manila"
 
 
 class PlushieLeaderboard(commands.Cog):
@@ -34,7 +55,6 @@ class PlushieLeaderboard(commands.Cog):
         interaction: discord.Interaction,
         timeframe: app_commands.Choice[str],
     ):
-        # 💖 Restrict to staff role
         if not any(role.id == STAFF_ROLE_ID for role in interaction.user.roles):
             await interaction.response.send_message(
                 "❌ You don’t have permission to use this command.",
@@ -48,18 +68,16 @@ class PlushieLeaderboard(commands.Cog):
         image_url = promo_data["image_url"]
         emoji = promo_data["emoji"]
         emoji_name = promo_data["emoji_name"]
-        catch_rate = promo_data["catch_rate"]
-        fish_rate = promo_data["fish_rate"]
-        battle_rate = promo_data["battle_rate"]
-        prize = promo_data["prize"]
 
         if timeframe.value == "today":
             now = datetime.now(ASIA_MANILA)
             top_drops = await get_top_daily_drops(self.bot, now)
             title = "🌸 Today's Top Plushie Collectors"
+            reset_note = get_reset_time_note()
         else:
             top_drops = await get_top_drops_in_range(self.bot)
             title = "🌷 All-Time Top Plushie Collectors (Past 12 Days)"
+            reset_note = None  # No reset note for all-time
 
         if not top_drops:
             await interaction.followup.send(
@@ -69,20 +87,25 @@ class PlushieLeaderboard(commands.Cog):
 
         embed = discord.Embed(
             title=title,
-            color=discord.Color.from_str("#FFB6C1"),  # 💖 Light Pink
+            color=discord.Color.from_str("#FFB6C1"),  # Light Pink
             description="Here's who’s been gathering the fluffiest finds!",
         )
-        embed.set_thumbnail(
-            url=interaction.guild.icon.url
-        )  # Optional cute plushie icon
+        embed.set_thumbnail(url=interaction.guild.icon.url)
 
         for idx, (user_id, count) in enumerate(top_drops, start=1):
             user = interaction.guild.get_member(user_id)
-            display_name = user.display_name
+            display_name = user.display_name if user else f"<User {user_id}>"
             name = user.mention if user else f"<User {user_id}>"
             embed.add_field(
                 name=f"#{idx} {display_name}",
                 value=f"> - **{count} {emoji_name}** {emoji}",
+                inline=False,
+            )
+
+        if reset_note:
+            embed.add_field(
+                name="\u200b",
+                value=f"{reset_note}",
                 inline=False,
             )
 

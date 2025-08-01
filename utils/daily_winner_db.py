@@ -74,6 +74,27 @@ async def clear_daily_winners(bot):
         await conn.execute("DELETE FROM daily_item_winners")
 
 
+def get_12pm_day_ranges(
+    start_date: datetime, num_days: int, tz
+) -> List[Tuple[datetime, datetime]]:
+    """
+    Generate a list of (start, end) datetime ranges from 12 PM to 11:59:59 AM the next day,
+    for the specified number of days starting from the given date.
+    """
+    # Ensure time is set to 12 PM, and in correct timezone
+    base = start_date.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=tz)
+
+    ranges = []
+    for i in range(num_days):
+        day_start = base + timedelta(days=i)
+        day_end = (
+            day_start + timedelta(days=1) - timedelta(microseconds=1)
+        )  # ends at 11:59:59.999999
+        ranges.append((day_start, day_end))
+
+    return ranges
+
+
 # ————————————————————————————————
 # 💖 Get top daily drops for a specific day in Asia/Manila timezone
 # ————————————————————————————————
@@ -82,10 +103,9 @@ async def get_top_daily_drops(bot, day: datetime) -> List[Tuple[int, int]]:
     💖 Retrieve (user_id, drops_count) for a given day.
     day: datetime (date portion used, timezone Asia/Manila)
     """
-    day = day.astimezone(ASIA_MANILA)
-    day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
-
+    # Shift window start to 12:00 PM of the given day
+    day_start = datetime(2025, 8, 1, 12, 0, 0, tzinfo=ASIA_MANILA)
+    day_end = datetime(2025, 8, 2, 11, 59, 59, 999999, tzinfo=ASIA_MANILA)
     async with bot.pg_pool.acquire() as conn:
         rows = await conn.fetch(
             """
@@ -133,3 +153,16 @@ async def get_daily_winner_count(bot: discord.Client, user_id: int) -> int:
     async with bot.pg_pool.acquire() as conn:
         count = await conn.fetchval(query, user_id)
     return count or 0
+
+
+async def get_current_day_number(bot) -> int:
+    async with bot.pg_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT day_number FROM current_day LIMIT 1;")
+        return row["day_number"] if row else 1  # fallback if not set
+
+
+async def increment_day_number(bot):
+    async with bot.pg_pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE current_day SET day_number = day_number + 1, last_updated = now();"
+        )

@@ -29,8 +29,11 @@ class EventWatcher(commands.Cog):
         self.reverse_usernames: Dict[str, int] = {}  # display_name -> user_id
 
     # Build or rebuild reverse username cache from current usernames
+
     def build_reverse_username_cache(self):
-        self.reverse_usernames = {v: k for k, v in self.usernames.items()}
+        self.reverse_usernames = {
+            username.lower(): user_id for user_id, username in self.usernames.items()
+        }
 
     # 💌 Handle new messages, only from PokéMeow bot
     async def handle_new_message(self, message: discord.Message):
@@ -55,23 +58,37 @@ class EventWatcher(commands.Cog):
         promo = promo_cache.promo
         await self.process_hershey_drops(message, promo)
 
-    # 🎯 Process battle messages to possibly award NPC plushie drops
     async def process_npc_drops(self, message: discord.Message, promo: Dict[str, Any]):
-        # Extract username from message
-        username_match = re.search(r"\*\*(.+?)\*\*", message.content)
-        if not username_match:
+        def extract_username_and_pokecoins(content: str):
+            # Extract username inside ** **
+            username_match = re.search(r":\S+:\s\*\*(.+?)\*\*\swon the battle", content)
+            username = username_match.group(1).lower() if username_match else None
+
+            # Check for PokéCoins amount like "1,180 PokeCoins"
+            pokecoin_match = re.search(r"([\d,]+) PokeCoins", content)
+            pokecoin_amount = (
+                int(pokecoin_match.group(1).replace(",", ""))
+                if pokecoin_match
+                else None
+            )
+            pokecoin_present = pokecoin_amount is not None
+
+            return username, pokecoin_present, pokecoin_amount
+
+        username, has_pokecoin, pokecoin_amount = extract_username_and_pokecoins(
+            message.content
+        )
+        if not username:
             # Could log message content once or twice here for inspection
             return
 
-        username = username_match.group(1).lower()
-        # Use cached reverse map
         user_id = self.reverse_usernames.get(username)
+        # print(f"[DEBUG] Cached username map: {self.reverse_usernames}")
 
         if not user_id:
             print(f"⚠️ [WARN] Username '{username}' not in cached usernames.")
             return
 
-        # Get member by ID for accuracy
         member = message.guild.get_member(user_id)
         if not member:
             print(f"⚠️ [WARN] Member with ID {user_id} not found in guild.")
@@ -80,6 +97,8 @@ class EventWatcher(commands.Cog):
         if member.id not in self.whitelisted_members:
             return
 
+        # If PokéCoins mentioned, you can do something here
+
         promo_emoji = promo["emoji"]
         promo_name = promo["name"]
         promo_emoji_name = promo["emoji_name"]
@@ -87,7 +106,7 @@ class EventWatcher(commands.Cog):
         roll = random.randint(1, promo["battle_rate"])
         rate = promo["battle_rate"]
 
-        # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
+        print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
 
         if roll == 1:
             drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
@@ -113,6 +132,8 @@ class EventWatcher(commands.Cog):
     async def process_hershey_drops(
         self, message: discord.Message, promo: Dict[str, Any]
     ):
+        # 🛠️ Testing override — boost drop chance for yourself
+
         if not message.guild or not message.reference:
             return
 
@@ -130,6 +151,7 @@ class EventWatcher(commands.Cog):
             return
 
         if member.id not in self.whitelisted_members:
+
             return
 
         if message.embeds:
@@ -162,7 +184,9 @@ class EventWatcher(commands.Cog):
                 else:
                     roll = random.randint(1, rate)
 
-                # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
+                print(
+                    f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})"
+                )
 
                 if roll == 1:
                     # 🛡 Don’t overwrite custom Mew message
@@ -225,7 +249,7 @@ class EventWatcher(commands.Cog):
                     and NON_WEEKLY_ROLE_ID not in role_ids
                 ):
                     self.whitelisted_members.add(member.id)
-                    self.usernames[member.id] = member.display_name.lower()
+                    self.usernames[member.id] = member.name.lower()
         # After loop:
         self.build_reverse_username_cache()
 
@@ -240,7 +264,6 @@ class EventWatcher(commands.Cog):
             f"✅ Whitelist: {len(self.whitelisted_members)}, Channels: {len(self.personal_channels)}"
         )
 
-
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         role_ids = {r.id for r in after.roles}
@@ -252,8 +275,8 @@ class EventWatcher(commands.Cog):
         ):
             self.whitelisted_members.add(after.id)
             # Update username if changed
-            if self.usernames.get(after.id) != after.display_name.lower():
-                self.usernames[after.id] = after.display_name.lower()
+            if self.usernames.get(after.id) != after.name.lower():
+                self.usernames[after.id] = after.name.lower()
                 self.build_reverse_username_cache()
         else:
             self.whitelisted_members.discard(after.id)
