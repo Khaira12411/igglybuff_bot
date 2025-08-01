@@ -81,7 +81,7 @@ class EventWatcher(commands.Cog):
             drop_type = "npc"
             roll = random.randint(1, promo["battle_rate"])
             rate = promo["battle_rate"]
-            print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
+            # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
 
             if roll == 1:
                 drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
@@ -157,7 +157,7 @@ class EventWatcher(commands.Cog):
                     roll = random.randint(1, rate)
 
                 print(
-                    f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})"
+                    # f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})"
                 )
 
                 if roll == 1:
