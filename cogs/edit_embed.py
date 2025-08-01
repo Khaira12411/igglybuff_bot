@@ -1,12 +1,11 @@
+import traceback
+
 import discord
 from discord import Embed, Interaction, app_commands
 from discord.ext import commands
 
 from config.constants import STAFF_ROLE_ID
 
-# ————————————————————————————————
-# 🛡️ Staff Role Check – Only trusted hands allowed!
-# ————————————————————————————————
 STAFF_ROLE_IDS = {STAFF_ROLE_ID, 987654321098765432}
 
 
@@ -36,12 +35,10 @@ class EmbedEdit(commands.Cog):
         message_id: str,
         embed_index: int = 1,
     ):
-        await interaction.response.defer(ephemeral=True)
-
         try:
             msg_id_int = int(message_id)
         except ValueError:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "Invalid message ID format. Please provide a valid numeric ID.",
                 ephemeral=True,
             )
@@ -50,17 +47,19 @@ class EmbedEdit(commands.Cog):
         try:
             message = await channel.fetch_message(msg_id_int)
         except Exception:
-            await interaction.followup.send("Message not found.", ephemeral=True)
+            await interaction.response.send_message(
+                "Message not found.", ephemeral=True
+            )
             return
 
         if not message.embeds:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "That message has no embeds.", ephemeral=True
             )
             return
 
         if embed_index < 1 or embed_index > len(message.embeds):
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 f"Invalid embed index. This message has {len(message.embeds)} embeds.",
                 ephemeral=True,
             )
@@ -69,8 +68,12 @@ class EmbedEdit(commands.Cog):
         embed = message.embeds[embed_index - 1]
         original_desc = embed.description or ""
 
-        # Now send the modal
-        await interaction.followup.send_modal(
+        # Truncate description if longer than 4000 chars to avoid Discord error
+        if len(original_desc) > 4000:
+            original_desc = original_desc[:4000]
+
+        # Send the modal immediately without deferring first
+        await interaction.response.send_modal(
             EditEmbedModal(original_desc, message, embed_index - 1)
         )
 
@@ -85,7 +88,7 @@ class EditEmbedModal(discord.ui.Modal, title="Edit Embed Description"):
             style=discord.TextStyle.paragraph,
             default=original_desc,
             required=True,
-            max_length=4096,
+            max_length=4000,
         )
         self.add_item(self.desc_input)
 
