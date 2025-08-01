@@ -26,18 +26,27 @@ class EmbedEdit(commands.Cog):
     @is_staff()
     @app_commands.describe(
         channel="Channel where the message is",
-        message_id="ID of the message to edit",
+        message_id="ID of the message to edit (paste raw ID, no brackets)",
         embed_index="Embed number to edit (starting from 1)",
     )
     async def edit_embed_desc(
         self,
         interaction: Interaction,
         channel: discord.TextChannel,
-        message_id: int,
+        message_id: str,  # Changed from int to str
         embed_index: int = 1,
     ):
         try:
-            message = await channel.fetch_message(message_id)
+            msg_id_int = int(message_id)  # convert string to int here
+        except ValueError:
+            await interaction.response.send_message(
+                "Invalid message ID format. Please provide a valid numeric ID.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            message = await channel.fetch_message(msg_id_int)
         except Exception:
             await interaction.response.send_message(
                 "Message not found.", ephemeral=True
