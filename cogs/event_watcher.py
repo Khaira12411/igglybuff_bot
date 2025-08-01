@@ -1,6 +1,5 @@
 import random
 import re
-from datetime import datetime
 from typing import Any, Dict
 from zoneinfo import ZoneInfo
 
@@ -11,7 +10,6 @@ from cogs.promo_refresher import promo_cache  # 🎀 Import existing promo cache
 from config.constants import *
 from config.emojis import Emojis
 from utils.record_drop import record_item_drop
-from utils.set_promo_db import get_promo
 from utils.visuals.clan_promo_embeds import build_drop_track_embed
 
 # 💗 Asia Manila timezone for any date/time operations
@@ -25,10 +23,17 @@ class EventWatcher(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.whitelisted_members = set()  # 🧂 Your whitelist cache
+        self.personal_channel_cache: Dict[int, int] = {}  # member_id -> channel_id
+        self.personal_channels: Dict[int, int] = {}  # user_id -> channel_id
+        self.usernames: Dict[int, str] = {}  # user_id -> display_name
+        self.reverse_usernames: Dict[str, int] = {}  # display_name -> user_id
+
+    # Build or rebuild reverse username cache from current usernames
+    def build_reverse_username_cache(self):
+        self.reverse_usernames = {v: k for k, v in self.usernames.items()}
 
     # 💌 Handle new messages, only from PokéMeow bot
     async def handle_new_message(self, message: discord.Message):
-
         if message.author.id != POKEMEOW_ID:
             return
 
@@ -52,56 +57,58 @@ class EventWatcher(commands.Cog):
 
     # 🎯 Process battle messages to possibly award NPC plushie drops
     async def process_npc_drops(self, message: discord.Message, promo: Dict[str, Any]):
-        content = message.content.lower()
-        if (
-            "won the battle" in content
-            and "you received" in content
-            and "pokecoin" in content
-        ):
-            username_match = re.search(r"\*\*(.+?)\*\*", message.content)
-            if not username_match:
-                print("⚠️ [WARN] Username not found in battle message.")
-                return
+        # Extract username from message
+        username_match = re.search(r"\*\*(.+?)\*\*", message.content)
+        if not username_match:
+            print("⚠️ [WARN] Username not found in battle message.")
+            return
 
-            username = username_match.group(1)
-            member = discord.utils.find(
-                lambda m: m.name == username or m.display_name == username,
-                message.guild.members,
+        username = username_match.group(1)
+
+        # Use cached reverse map
+        user_id = self.reverse_usernames.get(username)
+
+        if not user_id:
+            print(f"⚠️ [WARN] Username '{username}' not in cached usernames.")
+            return
+
+        # Get member by ID for accuracy
+        member = message.guild.get_member(user_id)
+        if not member:
+            print(f"⚠️ [WARN] Member with ID {user_id} not found in guild.")
+            return
+
+        if member.id not in self.whitelisted_members:
+            return
+
+        promo_emoji = promo["emoji"]
+        promo_name = promo["name"]
+        promo_emoji_name = promo["emoji_name"]
+        drop_type = "npc"
+        roll = random.randint(1, promo["battle_rate"])
+        rate = promo["battle_rate"]
+
+        # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
+
+        if roll == 1:
+            drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
+            print(f"🎉 {drop_msg}")
+            drop_message = await message.channel.send(drop_msg)
+            drop_message_id = drop_message.id
+            msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
+            await record_item_drop(self.bot, member.id, drop_type)
+            hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
+
+            drop_track_embed = build_drop_track_embed(
+                bot=self.bot,
+                member=member,
+                method="battle",
+                promo_emoji=promo_emoji,
+                promo_emoji_name=promo_emoji_name,
+                promo_name=promo_name,
+                msg_link=msg_link,
             )
-            if not member:
-                print(f"⚠️ [WARN] Member '{username}' not found in guild.")
-                return
-
-            if member.id not in self.whitelisted_members:
-                return
-
-            promo_emoji = promo["emoji"]
-            promo_name = promo["name"]
-            promo_emoji_name = promo["emoji_name"]
-            drop_type = "npc"
-            roll = random.randint(1, promo["battle_rate"])
-            rate = promo["battle_rate"]
-            # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
-
-            if roll == 1:
-                drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
-                print(f"🎉 {drop_msg}")
-                drop_message = await message.channel.send(drop_msg)
-                drop_message_id = drop_message.id
-                msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
-                await record_item_drop(self.bot, member.id, drop_type)
-                hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
-
-                drop_track_embed = build_drop_track_embed(
-                    bot=self.bot,
-                    member=member,
-                    method="battle",
-                    promo_emoji=promo_emoji,
-                    promo_emoji_name=promo_emoji_name,
-                    promo_name=promo_name,
-                    msg_link=msg_link,
-                )
-                await hunt_channel.send(embed=drop_track_embed)
+            await hunt_channel.send(embed=drop_track_embed)
 
     # 🎯 Process hershey reply messages to check for fish or catch plushie drops
     async def process_hershey_drops(
@@ -156,9 +163,7 @@ class EventWatcher(commands.Cog):
                 else:
                     roll = random.randint(1, rate)
 
-                print(
-                    # f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})"
-                )
+                # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
 
                 if roll == 1:
                     # 🛡 Don’t overwrite custom Mew message
@@ -187,17 +192,29 @@ class EventWatcher(commands.Cog):
     # 🎀 Discord event listener for new messages
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        # Only listen to messages in personal channels of whitelisted members
+        if message.channel.id not in self.personal_channels.values():
+            return
+
         await self.handle_new_message(message)
 
     # 🎀 Discord event listener for edited messages
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        # Only listen to messages in personal channels of whitelisted members
+        if after.channel.id not in self.personal_channels.values():
+            return
+
+        if after.author.id != POKEMEOW_ID:
+            return
         await self.handle_edit_message(after)
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print("🔄 Rebuilding whitelist cache...")
+        print("🔄 Rebuilding whitelist and personal channel caches...")
         self.whitelisted_members.clear()
+        self.usernames = {}
+        self.personal_channels = {}
 
         for guild in self.bot.guilds:
             for member in guild.members:
@@ -209,8 +226,20 @@ class EventWatcher(commands.Cog):
                     and NON_WEEKLY_ROLE_ID not in role_ids
                 ):
                     self.whitelisted_members.add(member.id)
+                    self.usernames[member.id] = member.display_name
+        # After loop:
+        self.build_reverse_username_cache()
 
-        print(f"✅ Whitelist built with {len(self.whitelisted_members)} members.")
+        # Load personal channels ONLY for whitelisted members
+        async with self.bot.pg_pool.acquire() as conn:
+            rows = await conn.fetch("SELECT user_id, channel_id FROM straymons_members")
+            for row in rows:
+                if row["user_id"] in self.whitelisted_members:
+                    self.personal_channels[row["user_id"]] = row["channel_id"]
+
+        print(
+            f"✅ Whitelist: {len(self.whitelisted_members)}, Channels: {len(self.personal_channels)}"
+        )
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
@@ -222,8 +251,16 @@ class EventWatcher(commands.Cog):
             and NON_WEEKLY_ROLE_ID not in role_ids
         ):
             self.whitelisted_members.add(after.id)
+            # Update username if changed
+            if self.usernames.get(after.id) != after.display_name:
+                self.usernames[after.id] = after.display_name
+                self.build_reverse_username_cache()
         else:
             self.whitelisted_members.discard(after.id)
+            # Remove username if present
+            if after.id in self.usernames:
+                self.usernames.pop(after.id)
+                self.build_reverse_username_cache()
 
 
 # ————————————————————————————————
