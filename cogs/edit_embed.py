@@ -33,13 +33,15 @@ class EmbedEdit(commands.Cog):
         self,
         interaction: Interaction,
         channel: discord.TextChannel,
-        message_id: str,  # Changed from int to str
+        message_id: str,
         embed_index: int = 1,
     ):
+        await interaction.response.defer(ephemeral=True)
+
         try:
-            msg_id_int = int(message_id)  # convert string to int here
+            msg_id_int = int(message_id)
         except ValueError:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Invalid message ID format. Please provide a valid numeric ID.",
                 ephemeral=True,
             )
@@ -48,19 +50,17 @@ class EmbedEdit(commands.Cog):
         try:
             message = await channel.fetch_message(msg_id_int)
         except Exception:
-            await interaction.response.send_message(
-                "Message not found.", ephemeral=True
-            )
+            await interaction.followup.send("Message not found.", ephemeral=True)
             return
 
         if not message.embeds:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "That message has no embeds.", ephemeral=True
             )
             return
 
         if embed_index < 1 or embed_index > len(message.embeds):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"Invalid embed index. This message has {len(message.embeds)} embeds.",
                 ephemeral=True,
             )
@@ -69,7 +69,8 @@ class EmbedEdit(commands.Cog):
         embed = message.embeds[embed_index - 1]
         original_desc = embed.description or ""
 
-        await interaction.response.send_modal(
+        # Now send the modal
+        await interaction.followup.send_modal(
             EditEmbedModal(original_desc, message, embed_index - 1)
         )
 
