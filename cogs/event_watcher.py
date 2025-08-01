@@ -60,11 +60,10 @@ class EventWatcher(commands.Cog):
         # Extract username from message
         username_match = re.search(r"\*\*(.+?)\*\*", message.content)
         if not username_match:
-            print("⚠️ [WARN] Username not found in battle message.")
+            # Could log message content once or twice here for inspection
             return
 
-        username = username_match.group(1)
-
+        username = username_match.group(1).lower()
         # Use cached reverse map
         user_id = self.reverse_usernames.get(username)
 
@@ -226,7 +225,7 @@ class EventWatcher(commands.Cog):
                     and NON_WEEKLY_ROLE_ID not in role_ids
                 ):
                     self.whitelisted_members.add(member.id)
-                    self.usernames[member.id] = member.display_name
+                    self.usernames[member.id] = member.display_name.lower()
         # After loop:
         self.build_reverse_username_cache()
 
@@ -241,6 +240,7 @@ class EventWatcher(commands.Cog):
             f"✅ Whitelist: {len(self.whitelisted_members)}, Channels: {len(self.personal_channels)}"
         )
 
+
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         role_ids = {r.id for r in after.roles}
@@ -252,8 +252,8 @@ class EventWatcher(commands.Cog):
         ):
             self.whitelisted_members.add(after.id)
             # Update username if changed
-            if self.usernames.get(after.id) != after.display_name:
-                self.usernames[after.id] = after.display_name
+            if self.usernames.get(after.id) != after.display_name.lower():
+                self.usernames[after.id] = after.display_name.lower()
                 self.build_reverse_username_cache()
         else:
             self.whitelisted_members.discard(after.id)
