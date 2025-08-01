@@ -25,10 +25,16 @@ class EmbedEdit(commands.Cog):
     )
     @is_staff()
     @app_commands.describe(
-        channel="Channel where the message is", message_id="ID of the message to edit"
+        channel="Channel where the message is",
+        message_id="ID of the message to edit",
+        embed_index="Embed number to edit (starting from 1)",
     )
     async def edit_embed_desc(
-        self, interaction: Interaction, channel: discord.TextChannel, message_id: int
+        self,
+        interaction: Interaction,
+        channel: discord.TextChannel,
+        message_id: int,
+        embed_index: int = 1,
     ):
         try:
             message = await channel.fetch_message(message_id)
@@ -44,20 +50,26 @@ class EmbedEdit(commands.Cog):
             )
             return
 
-        embed = message.embeds[0]
+        if embed_index < 1 or embed_index > len(message.embeds):
+            await interaction.response.send_message(
+                f"Invalid embed index. This message has {len(message.embeds)} embeds.",
+                ephemeral=True,
+            )
+            return
+
+        embed = message.embeds[embed_index - 1]
         original_desc = embed.description or ""
 
-        # Ask user for new description input with the original as placeholder
-        # Discord slash commands don’t support placeholders in inputs directly,
-        # so instead we can just show original desc in the prompt message
-
-        await interaction.response.send_modal(EditEmbedModal(original_desc, message))
+        await interaction.response.send_modal(
+            EditEmbedModal(original_desc, message, embed_index - 1)
+        )
 
 
 class EditEmbedModal(discord.ui.Modal, title="Edit Embed Description"):
-    def __init__(self, original_desc, message):
+    def __init__(self, original_desc, message, embed_index):
         super().__init__()
         self.message = message
+        self.embed_index = embed_index
         self.desc_input = discord.ui.TextInput(
             label="New Description",
             style=discord.TextStyle.paragraph,
@@ -68,11 +80,11 @@ class EditEmbedModal(discord.ui.Modal, title="Edit Embed Description"):
         self.add_item(self.desc_input)
 
     async def on_submit(self, interaction: Interaction):
-        embed = self.message.embeds[0]
-        embed.description = self.desc_input.value
+        embeds = [embed.copy() for embed in self.message.embeds]
+        embeds[self.embed_index].description = self.desc_input.value
 
         try:
-            await self.message.edit(embed=embed)
+            await self.message.edit(embeds=embeds)
             await interaction.response.send_message(
                 "Embed description updated!", ephemeral=True
             )
