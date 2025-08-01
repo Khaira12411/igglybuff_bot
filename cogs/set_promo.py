@@ -117,6 +117,7 @@ class PromoManager(commands.Cog):
 {Emojis.pink_exclamation} Notes:
 - {emoji} can only drop in this server!
 - Members must have <@&{HERSHEY_ROLE_ID}>, and <@&{DONATED_ROLE_ID}> to be eligible for {emoji} drops!
+- Use `/clan-promo-view` to check your progress
 
 {Emojis.pink_calendar} **Available until: {end_ts}**"""
         embed = discord.Embed(
@@ -133,9 +134,10 @@ class PromoManager(commands.Cog):
             description=desc,
             color=get_random_pink(),
         )
+        content = f"<@&{STRAYMONS_ROLE_ID}> {name} is live!"
         embed.set_image(url=image_url)
         bday_embed = build_birthday_event_embed()
-        await events_news_channel.send(embeds=[bday_embed, embed])
+        await events_news_channel.send(content=content, embeds=[bday_embed, embed])
 
 
 # ————————————————————————————————
