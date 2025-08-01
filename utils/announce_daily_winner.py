@@ -10,16 +10,21 @@ from utils.daily_winner_db import (  # This function should return how many time
     set_daily_winner,
 )
 
+BLOCKED_WINNER_IDS = {
+    1093841434525827142,  # Empy
+}
+
 ASIA_MANILA = ZoneInfo("Asia/Manila")  # 🕒 Timezone constant for Asia/Manila
-from utils.visuals.random_pink import get_random_pink
 from config.constants import *
+from utils.visuals.random_pink import get_random_pink
+
 
 # ————————————————————————————————
 # 🎉 announce_daily_winner – Sends daily winner announcement embed and saves winner
 # ————————————————————————————————
 async def announce_daily_winner(bot: discord.Client):
     # ⏰ Get previous day date and midnight time with timezone
-    
+
     announcement_channel_id = EVENT_NEWS_ID
 
     now = datetime.now(tz=ASIA_MANILA)
@@ -51,6 +56,11 @@ async def announce_daily_winner(bot: discord.Client):
 
     # 🛑 Skip users who already won 2 or more times, find next eligible
     for user_id, count in top_drops:
+
+        if user_id in BLOCKED_WINNER_IDS:
+            print(f"[Daily Winner] Skipping blocked user {user_id}")
+            continue
+
         wins = await get_daily_winner_count(bot, user_id)
         if wins < 2:
             winner_id = user_id

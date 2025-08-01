@@ -26,3 +26,5 @@ class Emojis:
     pink_bear = "<:pink_bear:1400384044180701224>"
     pink_cake = "<:pink_cake:1400384255217106964>"
     pink_heart_movin = "<a:pink_heart_movin:1400388375357427762>"
+    pink_link = "<:pink_link:1400807067643805787>"
+    pink_sparkle = "<a:pink_sparkle:1400830132695990272>"

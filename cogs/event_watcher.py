@@ -8,13 +8,7 @@ import discord
 from discord.ext import commands
 
 from cogs.promo_refresher import promo_cache  # 🎀 Import existing promo cache
-from config.constants import (
-    DONATED_ROLE_ID,
-    FISH_COLOR,
-    HERSHEY_ROLE_ID,
-    HUNT_CHANNEL_ID,
-    POKEMEOW_ID,
-)
+from config.constants import *
 from config.emojis import Emojis
 from utils.record_drop import record_item_drop
 from utils.set_promo_db import get_promo
@@ -30,17 +24,13 @@ ASIA_MANILA = ZoneInfo("Asia/Manila")
 class EventWatcher(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.whitelisted_members = set()  # 🧂 Your whitelist cache
 
     # 💌 Handle new messages, only from PokéMeow bot
     async def handle_new_message(self, message: discord.Message):
-        print(
-            f"🎀 [EVENT WATCHER] on_message from {message.author} (ID: {message.author.id})"
-        )
-        if message.author.id != POKEMEOW_ID:
-            print("💤 [SKIP] Message not from PokéMeow.")
-            return
 
-        print("✨ [MESSAGE WATCHER] Processing PokéMeow message...")
+        if message.author.id != POKEMEOW_ID:
+            return
 
         if not promo_cache.is_promo_active():
             print("💤 [SKIP] No active promo, skipping plushie drop check.")
@@ -51,17 +41,10 @@ class EventWatcher(commands.Cog):
 
     # 💌 Handle edited messages for hershey drops
     async def handle_edit_message(self, message: discord.Message):
-        print(
-            f"🎀 [EVENT WATCHER] on_message_edit from {message.author} (ID: {message.author.id})"
-        )
         if message.author.id != POKEMEOW_ID:
-            print("💤 [SKIP] Edited message not from PokéMeow.")
             return
 
-        print("✨ [EDIT WATCHER] Processing PokéMeow edited message...")
-
         if not promo_cache.is_promo_active():
-            print("💤 [SKIP] No active promo, skipping hershey drop check.")
             return
 
         promo = promo_cache.promo
@@ -89,31 +72,34 @@ class EventWatcher(commands.Cog):
                 print(f"⚠️ [WARN] Member '{username}' not found in guild.")
                 return
 
-            hershey_role = discord.utils.get(member.roles, id=HERSHEY_ROLE_ID)
-            donated_role = discord.utils.get(member.roles, id=DONATED_ROLE_ID)
-
-            if not hershey_role or not donated_role:
-                print(f"💤 [SKIP] Member {member} lacks required role.")
+            if member.id not in self.whitelisted_members:
                 return
+
             promo_emoji = promo["emoji"]
             promo_name = promo["name"]
             promo_emoji_name = promo["emoji_name"]
             drop_type = "npc"
             roll = random.randint(1, promo["battle_rate"])
-            print(f"🎲 [ROLL] Rolled {roll} for NPC battle drop (1 means success).")
+            rate = promo["battle_rate"]
+            print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
+
             if roll == 1:
-                drop_msg = f"{member.mention} has discovered a {promo_emoji} from battle! {Emojis.pink_heart_movin}"
+                drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
                 print(f"🎉 {drop_msg}")
-                await message.channel.send(drop_msg)
+                drop_message = await message.channel.send(drop_msg)
+                drop_message_id = drop_message.id
+                msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
                 await record_item_drop(self.bot, member.id, drop_type)
                 hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
 
                 drop_track_embed = build_drop_track_embed(
+                    bot=self.bot,
                     member=member,
                     method="battle",
                     promo_emoji=promo_emoji,
                     promo_emoji_name=promo_emoji_name,
                     promo_name=promo_name,
+                    msg_link=msg_link,
                 )
                 await hunt_channel.send(embed=drop_track_embed)
 
@@ -122,7 +108,6 @@ class EventWatcher(commands.Cog):
         self, message: discord.Message, promo: Dict[str, Any]
     ):
         if not message.guild or not message.reference:
-            print("💤 [SKIP] No guild or missing message reference for hershey drop.")
             return
 
         try:
@@ -136,14 +121,9 @@ class EventWatcher(commands.Cog):
 
         member = message.guild.get_member(replied_to.author.id)
         if not member:
-            print("💤 [SKIP] Replied member not found in guild.")
             return
 
-        hershey_role = discord.utils.get(member.roles, id=HERSHEY_ROLE_ID)
-        donated_role = discord.utils.get(member.roles, id=DONATED_ROLE_ID)
-
-        if not hershey_role or not donated_role:
-            print("💤 [SKIP] Member lacks required roles.")
+        if member.id not in self.whitelisted_members:
             return
 
         if message.embeds:
@@ -151,47 +131,56 @@ class EventWatcher(commands.Cog):
             description = embed.description.lower() if embed.description else ""
             embed_color = embed.color.value if embed.color else None
 
-            if embed_color is not None:
-                print(f"💗 [DEBUG] Embed color: #{embed_color:06x}")
-            else:
-                print("💗 [DEBUG] Embed has no color.")
-
             drop_type = None
             if "you caught a" in description:
-                print("✨ [DEBUG] Detected 'you caught a' phrase in embed description.")
                 promo_emoji = promo["emoji"]
                 promo_name = promo["name"]
                 promo_emoji_name = promo["emoji_name"]
                 if embed_color == FISH_COLOR:
                     drop_type = "fish"
                     rate = promo["fish_rate"]
-                    print(
-                        f"💗 [DEBUG] Color matches FISH_COLOR ({FISH_COLOR:#06x}), drop_type = fish."
-                    )
                 else:
                     drop_type = "catch"
                     rate = promo["catch_rate"]
-                    print(
-                        f"💗 [DEBUG] Color does NOT match FISH_COLOR ({FISH_COLOR:#06x}), drop_type = catch."
-                    )
 
-                roll = random.randint(1, rate)
+                # Extract caught Pokémon name
+                caught_match = re.search(r"you caught a (shiny )?(\w+)", description)
+                caught_pokemon = caught_match.group(2).lower() if caught_match else ""
+
+                # 🔥 Force drop if it's Mew
+                if caught_pokemon == "mew":
+                    roll = 1
+                    print(f"🌟 [FORCE DROP] {member.display_name} caught a Mew!")
+                    drop_type = "mew"
+                    drop_msg = f"{Emojis.pink_sparkle} {member.mention} has caught a Mew! Oh? It looks like it dropped a **{promo_emoji_name}** {promo_emoji} {Emojis.pink_heart_movin}"
+                else:
+                    roll = random.randint(1, rate)
+
                 print(
-                    f"🎲 [ROLL] Rolled {roll} for {drop_type} drop (1 means success)."
+                    f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})"
                 )
+
                 if roll == 1:
-                    drop_msg = f"{member.mention} has discovered a {promo_emoji} while {drop_type}ing! {Emojis.pink_heart_movin}"
+                    # 🛡 Don’t overwrite custom Mew message
+                    if caught_pokemon != "mew":
+                        drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} while {drop_type}ing! {Emojis.pink_heart_movin}"
                     print(f"🎉 {drop_msg}")
-                    await message.channel.send(drop_msg)
+
+                    drop_message = await message.channel.send(drop_msg)
+                    drop_message_id = drop_message.id
+                    msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
+
                     await record_item_drop(self.bot, member.id, drop_type)
                     hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
 
                     drop_track_embed = build_drop_track_embed(
+                        bot=self.bot,
                         member=member,
                         method=drop_type,
                         promo_emoji=promo_emoji,
                         promo_emoji_name=promo_emoji_name,
                         promo_name=promo_name,
+                        msg_link=msg_link,
                     )
                     await hunt_channel.send(embed=drop_track_embed)
 
@@ -204,6 +193,37 @@ class EventWatcher(commands.Cog):
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         await self.handle_edit_message(after)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print("🔄 Rebuilding whitelist cache...")
+        self.whitelisted_members.clear()
+
+        for guild in self.bot.guilds:
+            for member in guild.members:
+                role_ids = {r.id for r in member.roles}
+                if (
+                    HERSHEY_ROLE_ID in role_ids
+                    and DONATED_ROLE_ID in role_ids
+                    and ABSENT_ROLE_ID not in role_ids
+                    and NON_WEEKLY_ROLE_ID not in role_ids
+                ):
+                    self.whitelisted_members.add(member.id)
+
+        print(f"✅ Whitelist built with {len(self.whitelisted_members)} members.")
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        role_ids = {r.id for r in after.roles}
+        if (
+            HERSHEY_ROLE_ID in role_ids
+            and DONATED_ROLE_ID in role_ids
+            and ABSENT_ROLE_ID not in role_ids
+            and NON_WEEKLY_ROLE_ID not in role_ids
+        ):
+            self.whitelisted_members.add(after.id)
+        else:
+            self.whitelisted_members.discard(after.id)
 
 
 # ————————————————————————————————

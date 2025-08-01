@@ -37,6 +37,27 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+
+# ——————————————————————————————————————————————————————————————
+# 🌟 Global Error Handler for Commands
+# ——————————————————————————————————————————————————————————————
+@bot.event
+async def on_command_error(ctx, error):
+    """
+    Handles command errors globally.
+
+    Ignores CommandNotFound errors silently to reduce noise from users
+    typing commands meant for other bots (like MEE6's !buy).
+
+    Raises other errors to avoid hiding unexpected bugs.
+    """
+    if isinstance(error, commands.CommandNotFound):
+        # Unknown command - ignore silently
+        return
+    # Raise other errors so they don't get swallowed silently
+    raise error
+
+
 ASIA_MANILA = ZoneInfo("Asia/Manila")
 
 MORNING_STATUSES = [
@@ -127,6 +148,8 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Activity(type=activity_type, name=message)
     )
+
+
 
 
 @bot.event
