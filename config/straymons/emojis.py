@@ -28,3 +28,4 @@ class Emojis:
     pink_heart_movin = "<a:pink_heart_movin:1400388375357427762>"
     pink_link = "<:pink_link:1400807067643805787>"
     pink_sparkle = "<a:pink_sparkle:1400830132695990272>"
+    pink_trophy = "<:pink_trophy:1401173005647740928>"

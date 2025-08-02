@@ -18,6 +18,8 @@ class SchedulerCog(commands.Cog):
         # 🎀 Setting up the dreamy AsyncIOScheduler with Manila timezone magic
         self.scheduler = AsyncIOScheduler(timezone=ASIA_MANILA)
 
+        print("🩷 [SCHEDULER] Initializing scheduler and preparing job...")
+
         # 🌸 Schedule the sparkling daily announcement at noon Manila time
         self.scheduler.add_job(
             self.run_announcement,
@@ -25,8 +27,21 @@ class SchedulerCog(commands.Cog):
             id="daily_winner_announcement",
             replace_existing=True,
         )
+
+        print("🌸 [SCHEDULER] Daily winner announcement job added! 🌼")
+
         # 🩷 Start the scheduler so it can sprinkle daily joy
         self.scheduler.start()
+        print("🩷 [SCHEDULER] Scheduler has started! Ready to sparkle ✨")
+
+        # 🪷 Show scheduled job(s) now that they're initialized
+        for job in self.scheduler.get_jobs():
+            next_run = (
+                job.next_run_time.isoformat()
+                if job.next_run_time
+                else "Not scheduled yet"
+            )
+            print(f"🔔 [SCHEDULER] Job ID: {job.id}, Next Run: {next_run}")
 
     # 💗 The heart of the cog: run the announcement if we're still in the right guild
     async def run_announcement(self):
@@ -34,18 +49,17 @@ class SchedulerCog(commands.Cog):
         if guild is None:
             # 🌷 Oops! We're not in the guild anymore, skipping today’s shine
             print(
-                f"[SchedulerCog] Guild with ID {self.guild_id} not found. Skipping announcement."
+                f"💔 [SCHEDULER] Guild with ID {self.guild_id} not found. Skipping today’s twinkle!"
             )
             return
 
         # ✨ Yay! Announcing the daily winner for our lovely guild
         print(
-            f"[SchedulerCog] Running daily winner announcement for guild {guild.name} ({guild.id})"
+            f"🎉 [SCHEDULER] Running daily winner announcement for {guild.name} ({guild.id}) 💝"
         )
         await announce_daily_winner(self.bot)
 
 
 # 🎀 Cog setup: adding SchedulerCog with your special guild ID
 async def setup(bot):
-    # 💖 Replace 123456789012345678 with your actual guild ID 💖
     await bot.add_cog(SchedulerCog(bot, STRAYMONS_GUILD_ID))

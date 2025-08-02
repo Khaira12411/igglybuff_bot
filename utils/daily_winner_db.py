@@ -166,3 +166,16 @@ async def increment_day_number(bot):
         await conn.execute(
             "UPDATE current_day SET day_number = day_number + 1, last_updated = now();"
         )
+
+
+async def check_daily_winner_exists_for_day(bot, winner_date: date) -> bool:
+    async with bot.pg_pool.acquire() as conn:
+        result = await conn.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM daily_item_winners WHERE winner_date = $1
+            )
+            """,
+            winner_date,
+        )
+        return result

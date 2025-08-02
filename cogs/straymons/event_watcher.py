@@ -125,7 +125,7 @@ class EventWatcher(commands.Cog):
             await record_item_drop(self.bot, member.id, drop_type)
             hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
 
-            drop_track_embed = build_drop_track_embed(
+            drop_track_embed = await build_drop_track_embed(
                 bot=self.bot,
                 member=member,
                 method="battle",
@@ -180,16 +180,27 @@ class EventWatcher(commands.Cog):
                     drop_type = "catch"
                     rate = promo["catch_rate"]
 
-                # Extract caught Pokémon name
-                caught_match = re.search(r"you caught a (shiny )?(\w+)", description)
+                description_clean = description.lower().replace("**", "")
+
+                caught_match = re.search(
+                    r"you caught a\s+(?::\w+:)?\s*(shiny )?(\w+)", description_clean
+                )
                 caught_pokemon = caught_match.group(2).lower() if caught_match else ""
+
+                # Debug output
+                # print(f"[DEBUG] Cleaned description: {description_clean}")
+                # print(f"[DEBUG] Matched Pokémon: {caught_pokemon}")
 
                 # 🔥 Force drop if it's Mew
                 if caught_pokemon == "mew":
                     roll = 1
                     print(f"🌟 [FORCE DROP] {member.display_name} caught a Mew!")
                     drop_type = "mew"
-                    drop_msg = f"{Emojis.pink_sparkle} {member.mention} has caught a Mew! Oh? It looks like it dropped a **{promo_emoji_name}** {promo_emoji} {Emojis.pink_heart_movin}"
+                    drop_msg = (
+                        f"{Emojis.pink_sparkle} {member.mention} has caught a Mew! "
+                        f"Oh? It looks like it dropped a **{promo_emoji_name}** {promo_emoji} {Emojis.pink_heart_movin}"
+                    )
+
                 else:
                     roll = random.randint(1, rate)
 
@@ -208,7 +219,7 @@ class EventWatcher(commands.Cog):
                     await record_item_drop(self.bot, member.id, drop_type)
                     hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
 
-                    drop_track_embed = build_drop_track_embed(
+                    drop_track_embed = await build_drop_track_embed(
                         bot=self.bot,
                         member=member,
                         method=drop_type,

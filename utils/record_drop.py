@@ -30,6 +30,31 @@ async def record_item_drop(
         )
 
 
+async def record_manual_item_drop(
+    bot,
+    user_id: int,
+    method: str,
+    day: int,
+    drop_time: datetime = None,
+):
+    """
+    💖 Manually record a drop for a specific day, skipping the current_day lookup.
+    """
+    drop_time = drop_time or datetime.now(tz=ASIA_MANILA)
+
+    async with bot.pg_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO member_item_drops (user_id, method, drop_time, day)
+            VALUES ($1, $2, $3, $4)
+            """,
+            user_id,
+            method,
+            drop_time,
+            day,
+        )
+
+
 # 💖 Get total number of item drops for a user
 async def get_total_drops(bot, user_id: int) -> int:
     async with bot.pg_pool.acquire() as conn:
