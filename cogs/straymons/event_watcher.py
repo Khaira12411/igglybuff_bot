@@ -118,7 +118,9 @@ class EventWatcher(commands.Cog):
 
         if roll == 1:
             drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
-            print(f"🎉 {drop_msg}")
+            drop_msg_logs = f"{member.display_name} has discovered a **{promo_emoji_name}** while {drop_type}ing!"
+
+            print(f"🎉 {drop_msg_logs}")
             drop_message = await message.channel.send(drop_msg)
             drop_message_id = drop_message.id
             msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
@@ -210,7 +212,9 @@ class EventWatcher(commands.Cog):
                     # 🛡 Don’t overwrite custom Mew message
                     if caught_pokemon != "mew":
                         drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} while {drop_type}ing! {Emojis.pink_heart_movin}"
-                    print(f"🎉 {drop_msg}")
+                        drop_msg_logs = f"{member.display_name} has discovered a **{promo_emoji_name}** while {drop_type}ing!"
+
+                    print(f"🎉 {drop_msg_logs}")
 
                     drop_message = await message.channel.send(drop_msg)
                     drop_message_id = drop_message.id

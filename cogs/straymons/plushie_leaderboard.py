@@ -8,6 +8,7 @@ from discord.ext import commands
 from cogs.straymons.promo_refresher import get_active_promo_cache
 from config.guild_ids import STRAYMONS_GUILD_ID
 from config.straymons.constants import STAFF_ROLE_ID
+from config.straymons.emojis import Emojis
 from utils.daily_winner_db import get_top_daily_drops, get_top_drops_in_range
 
 ASIA_MANILA = ZoneInfo("Asia/Manila")
@@ -16,23 +17,20 @@ STAFF_ROLE_ID = STAFF_ROLE_ID  # 🔐 Replace with your actual staff role ID
 
 def get_reset_time_note():
     now = datetime.now(tz=ASIA_MANILA)
-    # Calculate next reset time (12 PM today or tomorrow if past 12 PM)
-    reset_time = now.replace(hour=12, minute=0, second=0, microsecond=0)
-    if now >= reset_time:
-        reset_time += timedelta(days=1)
-    # Format nicely for user display, e.g. "Aug 2, 12:00 PM"
-    formatted = reset_time.strftime("%b %d, %I:%M %p")
-    return f"*Stats reset at {formatted} Asia/Manila*"
 
+    # Start is today at 12:00 PM
+    start = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    if now < start:
+        start -= timedelta(days=1)
 
-def get_reset_time_note():
-    now = datetime.now(tz=ASIA_MANILA)
-    reset_time = now.replace(hour=12, minute=0, second=0, microsecond=0)
-    if now >= reset_time:
-        reset_time += timedelta(days=1)
-    unix_ts = int(reset_time.timestamp())
-    # Format with Discord's timestamp markdown, showing absolute and relative time
-    return f"Stats reset <t:{unix_ts}:f> (<t:{unix_ts}:R>) Asia/Manila"
+    # End is the next day at 11:59 AM
+    end = start + timedelta(hours=23, minutes=59)
+
+    # Convert to Unix timestamps for Discord
+    start_ts = int(start.timestamp())
+    end_ts = int(end.timestamp())
+
+    return f"{Emojis.pink_clock} **Stats recorded from:** <t:{start_ts}:f> → <t:{end_ts}:f> *(Asia/Manila)*"
 
 
 class PlushieLeaderboard(commands.Cog):
@@ -73,7 +71,7 @@ class PlushieLeaderboard(commands.Cog):
 
         if timeframe.value == "today":
             now = datetime.now(ASIA_MANILA)
-            top_drops = await get_top_daily_drops(self.bot, now)
+            top_drops = await get_top_daily_drops(self.bot)
             title = "🌸 Today's Top Plushie Collectors"
             reset_note = get_reset_time_note()
         else:

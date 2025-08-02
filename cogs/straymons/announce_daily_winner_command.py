@@ -54,7 +54,7 @@ class AnnounceDailyWinner(commands.Cog):
             )
             return
 
-        top_drops = await get_top_daily_drops(self.bot, day=day)
+        top_drops = await get_top_daily_drops(self.bot)
         if not top_drops:
             await interaction.followup.send(f"❌ No drops recorded for Day {day}.")
             return

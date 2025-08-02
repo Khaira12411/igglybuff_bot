@@ -29,3 +29,4 @@ class Emojis:
     pink_link = "<:pink_link:1400807067643805787>"
     pink_sparkle = "<a:pink_sparkle:1400830132695990272>"
     pink_trophy = "<:pink_trophy:1401173005647740928>"
+    pink_clock = "<:pink_clock:1401234117106077869>"

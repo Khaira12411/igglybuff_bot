@@ -98,25 +98,30 @@ def get_12pm_day_ranges(
 # ————————————————————————————————
 # 💖 Get top daily drops for a specific day in Asia/Manila timezone
 # ————————————————————————————————
-async def get_top_daily_drops(bot, day: datetime) -> List[Tuple[int, int]]:
+async def get_top_daily_drops(bot) -> List[Tuple[int, int]]:
     """
-    💖 Retrieve (user_id, drops_count) for a given day.
-    day: datetime (date portion used, timezone Asia/Manila)
+    💖 Retrieve (user_id, drops_count) for the current day based on current_day.day_number.
     """
-    # Shift window start to 12:00 PM of the given day
-    day_start = datetime(2025, 8, 1, 12, 0, 0, tzinfo=ASIA_MANILA)
-    day_end = datetime(2025, 8, 2, 11, 59, 59, 999999, tzinfo=ASIA_MANILA)
     async with bot.pg_pool.acquire() as conn:
+        # Get the current day number
+        current_day_row = await conn.fetchrow(
+            "SELECT day_number FROM current_day LIMIT 1;"
+        )
+        if not current_day_row:
+            return []
+
+        day_number = current_day_row["day_number"]
+
+        # Query drops for the current day
         rows = await conn.fetch(
             """
             SELECT user_id, COUNT(*) AS drops_count
             FROM member_item_drops
-            WHERE drop_time >= $1 AND drop_time < $2
+            WHERE day = $1
             GROUP BY user_id
             ORDER BY drops_count DESC;
             """,
-            day_start,
-            day_end,
+            day_number,
         )
         return [(r["user_id"], r["drops_count"]) for r in rows]
 

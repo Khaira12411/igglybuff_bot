@@ -73,7 +73,7 @@ async def announce_daily_winner(bot: discord.Client):
     print(f"[Daily Winner] Current Day {current_day_number} — {day_start} to {day_end}")
 
     # 📊 Get top drops within current day range
-    top_drops = await get_top_daily_drops(bot, day_start, day_end)
+    top_drops = await get_top_daily_drops(bot)
     if not top_drops:
         print("[Daily Winner] No drops recorded for this day.")
         return
