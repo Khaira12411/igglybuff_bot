@@ -1,9 +1,10 @@
 # 💗 cogs/clan/reset_clan_promo.py
 import discord
+from asyncpg import UniqueViolationError
 from discord import app_commands
 from discord.ext import commands
-from asyncpg import UniqueViolationError
 
+from config.guild_ids import STRAYMONS_GUILD_ID
 from utils.get_pg_pool import get_pg_pool
 
 
@@ -15,6 +16,7 @@ class ResetClanPromo(commands.Cog):
         name="reset-clan-promo",
         description="🌸 Resets all clan promo data (USE WITH CAUTION)",
     )
+    @app_commands.guilds(discord.Object(id=STRAYMONS_GUILD_ID))
     @app_commands.checks.has_permissions(administrator=True)
     async def reset_clan_promo(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)

@@ -8,9 +8,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.promo_refresher import get_active_promo_cache
-from config.constants import *
-from config.emojis import Emojis
+from cogs.straymons.promo_refresher import get_active_promo_cache
+from config.guild_ids import STRAYMONS_GUILD_ID
+from config.straymons.constants import *
+from config.straymons.emojis import Emojis
 from utils.record_drop import get_daily_drops, get_total_drops
 from utils.visuals.random_pink import get_random_pink
 
@@ -26,6 +27,7 @@ class ClanPromo(commands.Cog):
         name="clan-promo-view",
         description="🌸 View current clan promo and your plushie progress!",
     )
+    @app_commands.guilds(discord.Object(id=STRAYMONS_GUILD_ID))
     async def clan_promo_view(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
         user = interaction.user

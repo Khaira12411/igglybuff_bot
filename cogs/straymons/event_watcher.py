@@ -6,9 +6,10 @@ from zoneinfo import ZoneInfo
 import discord
 from discord.ext import commands
 
-from cogs.promo_refresher import promo_cache  # 🎀 Import existing promo cache
-from config.constants import *
-from config.emojis import Emojis
+from cogs.straymons.promo_refresher import promo_cache  # 🎀 Import existing promo cache
+from config.guild_ids import *
+from config.straymons.constants import *
+from config.straymons.emojis import Emojis
 from utils.record_drop import record_item_drop
 from utils.visuals.clan_promo_embeds import build_drop_track_embed
 
@@ -30,6 +31,9 @@ class EventWatcher(commands.Cog):
 
     # Build or rebuild reverse username cache from current usernames
 
+    def is_straymons_guild(self, guild: discord.Guild | None):
+        return guild and guild.id == STRAYMONS_GUILD_ID
+
     def build_reverse_username_cache(self):
         self.reverse_usernames = {
             username.lower(): user_id for user_id, username in self.usernames.items()
@@ -49,6 +53,10 @@ class EventWatcher(commands.Cog):
 
     # 💌 Handle edited messages for hershey drops
     async def handle_edit_message(self, message: discord.Message):
+        if not message.guild or message.guild.id != STRAYMONS_GUILD_ID:
+
+            return
+
         if message.author.id != POKEMEOW_ID:
             return
 
@@ -106,7 +114,7 @@ class EventWatcher(commands.Cog):
         roll = random.randint(1, promo["battle_rate"])
         rate = promo["battle_rate"]
 
-        print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
+        # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
 
         if roll == 1:
             drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
@@ -132,7 +140,8 @@ class EventWatcher(commands.Cog):
     async def process_hershey_drops(
         self, message: discord.Message, promo: Dict[str, Any]
     ):
-        # 🛠️ Testing override — boost drop chance for yourself
+        if message.guild.id != STRAYMONS_GUILD_ID:
+            return
 
         if not message.guild or not message.reference:
             return
@@ -184,9 +193,7 @@ class EventWatcher(commands.Cog):
                 else:
                     roll = random.randint(1, rate)
 
-                print(
-                    f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})"
-                )
+                # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
 
                 if roll == 1:
                     # 🛡 Don’t overwrite custom Mew message
@@ -215,7 +222,9 @@ class EventWatcher(commands.Cog):
     # 🎀 Discord event listener for new messages
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        # Only listen to messages in personal channels of whitelisted members
+        # Only listen to messages in personal channels of whitelisted
+        if message.guild.id != STRAYMONS_GUILD_ID:
+            return
         if message.channel.id not in self.personal_channels.values():
             return
 
@@ -224,6 +233,8 @@ class EventWatcher(commands.Cog):
     # 🎀 Discord event listener for edited messages
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        if not after.guild or after.guild.id != STRAYMONS_GUILD_ID:
+            return
         # Only listen to messages in personal channels of whitelisted members
         if after.channel.id not in self.personal_channels.values():
             return
@@ -240,6 +251,8 @@ class EventWatcher(commands.Cog):
         self.personal_channels = {}
 
         for guild in self.bot.guilds:
+            if not self.is_straymons_guild(guild):
+                continue
             for member in guild.members:
                 role_ids = {r.id for r in member.roles}
                 if (
@@ -266,7 +279,11 @@ class EventWatcher(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
+        if after.guild.id != STRAYMONS_GUILD_ID:
+            return
+
         role_ids = {r.id for r in after.roles}
+
         if (
             HERSHEY_ROLE_ID in role_ids
             and DONATED_ROLE_ID in role_ids

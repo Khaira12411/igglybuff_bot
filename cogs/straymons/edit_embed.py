@@ -4,7 +4,8 @@ import discord
 from discord import Embed, Interaction, app_commands
 from discord.ext import commands
 
-from config.constants import STAFF_ROLE_ID
+from config.guild_ids import STRAYMONS_GUILD_ID
+from config.straymons.constants import STAFF_ROLE_ID
 
 STAFF_ROLE_IDS = {STAFF_ROLE_ID, 987654321098765432}
 
@@ -22,6 +23,7 @@ class EmbedEdit(commands.Cog):
     @app_commands.command(
         name="edit_embed_desc", description="Edit the description of an embed message"
     )
+    @app_commands.guilds(discord.Object(id=STRAYMONS_GUILD_ID))
     @is_staff()
     @app_commands.describe(
         channel="Channel where the message is",

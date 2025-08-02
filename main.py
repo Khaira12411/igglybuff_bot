@@ -1,18 +1,19 @@
 import logging
 
 # Suppress discord.py logs (must be set BEFORE imports)
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.CRITICAL)
+
 for logger_name in [
     "discord",
-    "discord.client",
     "discord.gateway",
     "discord.http",
     "discord.voice_client",
     "asyncio",
 ]:
-    # Suppress the PyNaCl voice support warning
-    logging.getLogger("discord.client").setLevel(logging.ERROR)
-    logging.getLogger(logger_name).setLevel(logging.WARNING)
+    logging.getLogger(logger_name).setLevel(logging.CRITICAL)
+
+# Set discord.client logs to CRITICAL as well
+logging.getLogger("discord.client").setLevel(logging.CRITICAL)
 
 import glob
 import os
@@ -25,8 +26,10 @@ import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
-from cogs.promo_refresher import get_active_promo_cache, promo_cache
+from cogs.straymons.promo_refresher import get_active_promo_cache, promo_cache
+from config.guild_ids import *
 from utils.get_pg_pool import get_pg_pool
+from utils.rate_limit_logger import setup_rate_limit_logging
 from utils.set_promo_db import get_promo
 
 intents = discord.Intents.default()
@@ -36,6 +39,7 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+setup_rate_limit_logging(bot)
 
 
 # ——————————————————————————————————————————————————————————————
@@ -43,18 +47,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ——————————————————————————————————————————————————————————————
 @bot.event
 async def on_command_error(ctx, error):
-    """
-    Handles command errors globally.
-
-    Ignores CommandNotFound errors silently to reduce noise from users
-    typing commands meant for other bots (like MEE6's !buy).
-
-    Raises other errors to avoid hiding unexpected bugs.
-    """
     if isinstance(error, commands.CommandNotFound):
-        # Unknown command - ignore silently
         return
-    # Raise other errors so they don't get swallowed silently
     raise error
 
 
@@ -96,7 +90,7 @@ def get_time_based_statuses():
 # 💗 Load promo into cache manually at startup (so it's ready before any commands use it)
 async def preload_promo(bot):
     promo_cache.promo = await get_promo(bot)
-    print("[💖 PROMO CACHE] Loaded promo cache at startup (on_ready)")
+    print("[🩷  PROMO CACHE] Loaded promo cache at startup (on_ready)")
 
 
 async def get_dynamic_status_tuple():
@@ -110,7 +104,7 @@ async def get_dynamic_status_tuple():
 @tasks.loop(minutes=5)
 async def status_rotator():
     activity_type, message = await get_dynamic_status_tuple()
-    print(f"[💖 STATUS] Switching to: {activity_type.name} → {message}")
+    print(f"[🩷 STATUS] Switching to: {activity_type.name} → {message}")
     await bot.change_presence(
         activity=discord.Activity(type=activity_type, name=message)
     )
@@ -125,31 +119,25 @@ async def on_ready():
         f"[💗✨ IGGLYBUFF] I’m awake and twinkling as {bot.user} ✨ Ready to sparkle!\n"
     )
 
-    # 💗 Load promo early so presence/status + commands have access to it
     await preload_promo(bot)
 
-    # 🌷 Ensure all application (slash) commands are registered with Discord
+    # Sync fallback (global sync safety)
     await bot.tree.sync()
-    print("[🌷 Commands] Slash commands synced with Discord successfully! 💫")
+    print("[🩷  Commands] Slash commands synced with Discord successfully! 💫")
 
-    # 💖 Confirm PostgreSQL connection
     if hasattr(bot, "pg_pool"):
-        print("[🌸 Database] PostgreSQL connection pool is ready! 🧺")
+        print("[🩷  Database] PostgreSQL connection pool is ready! 🧺")
     else:
         print("[⚠️ Warning] pg_pool is not attached!")
 
-    # 💤 Start the rotating presence/status loop
     if not status_rotator.is_running():
         print("[🩷 STATUS] Starting Igglybuff’s dreamy thoughts loop... 🌙")
         status_rotator.start()
 
-    # ✨ Set a soft, rotating presence
     activity_type, message = await get_dynamic_status_tuple()
     await bot.change_presence(
         activity=discord.Activity(type=activity_type, name=message)
     )
-
-
 
 
 @bot.event
@@ -160,15 +148,15 @@ async def setup_hook():
         pg_pool = await get_pg_pool()
         async with pg_pool.acquire() as conn:
             version = await conn.fetchval("SELECT version();")
-            print(f"[🧺 Postgres] Connected! Version: {version}")
+            print(f"[🩷  Postgres] Connected! Version: {version}")
         bot.pg_pool = pg_pool
     except Exception as e:
         print(f"[❌ Postgres] Connection failed: {e}")
 
     loaded_count = 0
-    for cog_path in glob.glob("cogs/*.py"):
-        filename = os.path.basename(cog_path)
-        module_name = filename[:-3].replace("-", "_")
+    for cog_path in glob.glob("cogs/**/*.py", recursive=True):
+        relative_path = os.path.relpath(cog_path, "cogs")
+        module_name = relative_path[:-3].replace(os.sep, ".")
         cog_name = f"cogs.{module_name}"
         try:
             await bot.load_extension(cog_name)
@@ -177,6 +165,16 @@ async def setup_hook():
             print(f"[💔 COG] Failed to load {cog_name}: {e}")
 
     print(f"[🎀 COGS] All fluffed up: {loaded_count} cogs loaded successfully! 🌸")
+
+    # ——————————
+    # 💠 Sync only the two guilds you care about
+    # ——————————
+    try:
+        await bot.tree.sync(guild=discord.Object(id=STRAYMONS_GUILD_ID))
+        # await bot.tree.sync(guild=discord.Object(id=MEOW_SUMMIT_GUILD_ID))
+        print("[🩷  Slash] Commands synced to Straymons + MeowSummit! 🍥")
+    except Exception as e:
+        print(f"[❌ Slash] Guild sync failed: {e}")
 
 
 if __name__ == "__main__":

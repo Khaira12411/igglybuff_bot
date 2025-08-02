@@ -4,8 +4,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config.constants import *
-from config.emojis import Emojis
+from config.straymons.constants import *
+from config.straymons.emojis import Emojis
 from utils.set_promo_db import set_promo_data
 from utils.visuals.clan_promo_embeds import build_birthday_event_embed
 from utils.visuals.random_pink import get_random_pink
@@ -46,6 +46,7 @@ class PromoManager(commands.Cog):
         name="set-promo",
         description="🌸 Set or update a special promo event with drop rates and roles!",
     )
+    @app_commands.guilds(discord.Object(id=STRAYMONS_GUILD_ID))
     @is_staff()
     @app_commands.describe(
         name="Name of the promo event",

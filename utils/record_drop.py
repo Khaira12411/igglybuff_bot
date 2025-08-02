@@ -47,7 +47,7 @@ async def get_total_drops(bot, user_id: int) -> int:
 async def get_daily_drops(bot, user_id: int) -> int:
     async with bot.pg_pool.acquire() as conn:
         # 🌸 Get current day from current_day table
-        current_day = await conn.fetchval("SELECT day FROM current_day LIMIT 1")
+        current_day = await conn.fetchval("SELECT day_number FROM current_day LIMIT 1")
 
         if current_day is None:
             print("[WARN] current_day table has no value.")

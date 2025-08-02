@@ -5,12 +5,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config.constants import STAFF_ROLE_ID
+from cogs.straymons.promo_refresher import get_active_promo_cache
+from config.guild_ids import STRAYMONS_GUILD_ID
+from config.straymons.constants import STAFF_ROLE_ID
 from utils.daily_winner_db import get_top_daily_drops, get_top_drops_in_range
 
 ASIA_MANILA = ZoneInfo("Asia/Manila")
 STAFF_ROLE_ID = STAFF_ROLE_ID  # 🔐 Replace with your actual staff role ID
-from cogs.promo_refresher import get_active_promo_cache
 
 
 def get_reset_time_note():
@@ -41,6 +42,7 @@ class PlushieLeaderboard(commands.Cog):
     @app_commands.command(
         name="plushie-leaderboard", description="💖 View top plushie collectors!"
     )
+    @app_commands.guilds(discord.Object(id=STRAYMONS_GUILD_ID))
     @app_commands.describe(
         timeframe="Choose 'All Time' or 'Today' to view the leaderboard type"
     )

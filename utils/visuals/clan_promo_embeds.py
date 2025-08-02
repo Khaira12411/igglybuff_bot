@@ -2,7 +2,7 @@ import re
 
 import discord
 
-from config.emojis import Emojis
+from config.straymons.emojis import Emojis
 from utils.visuals.random_pink import get_random_pink
 
 bday_event_desc = f"""# {Emojis.sakura_moon} Skaia’s Birthday Event

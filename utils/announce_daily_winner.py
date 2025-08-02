@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 import discord
 
-from cogs.promo_refresher import get_active_promo_cache
+from cogs.straymons.promo_refresher import get_active_promo_cache
 from utils.daily_winner_db import *
 from utils.daily_winner_db import (  # This function should return how many times a user has won; 📥 Import DB functions for drops and winner
     get_daily_winner_count,
@@ -17,7 +17,7 @@ BLOCKED_WINNER_IDS = {
 }
 
 ASIA_MANILA = ZoneInfo("Asia/Manila")  # 🕒 Timezone constant for Asia/Manila
-from config.constants import *
+from config.straymons.constants import *
 from utils.visuals.random_pink import get_random_pink
 
 # 🔁 Modify this constant if DAY 1 ever changes:
