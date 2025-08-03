@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import discord
 
 from cogs.straymons.promo_refresher import get_active_promo_cache
+from config.straymons.constants import HUNT_CHANNEL_ID
 from config.straymons.emojis import Emojis
 from utils.daily_winner_db import *
 from utils.time import *
@@ -36,7 +37,7 @@ async def announce_daily_winner(bot: discord.Client):
         if not top_overall:
             print("[Daily Winner] No overall drops recorded. Exiting.")
             return
-
+        hunt_channel = bot.get_channel(HUNT_CHANNEL_ID)
         channel = bot.get_channel(announcement_channel_id)
         if not channel:
             print("[Daily Winner] Announcement channel not found. Exiting.")
@@ -141,3 +142,10 @@ async def announce_daily_winner(bot: discord.Client):
 
     await increment_day_number(bot)
     print(f"[Daily Winner] Rolled over to Day {current_day_number + 1}.")
+    new_day = current_day_number + 1
+
+    hunt_channel = bot.get_channel(HUNT_CHANNEL_ID)
+    content = (
+        f"# ────────────── ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ NEW {new_day} ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ ──────────────"
+    )
+    await hunt_channel.send(content=content)
