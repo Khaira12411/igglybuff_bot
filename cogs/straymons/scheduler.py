@@ -24,7 +24,7 @@ class SchedulerCog(commands.Cog):
         # 🌸 Schedule the sparkling daily announcement at noon Manila time
         self.scheduler.add_job(
             self.run_announcement,
-            CronTrigger(hour=12, minute=0),
+            CronTrigger(hour=12, minute=0, timezone=ASIA_MANILA),
             id="daily_winner_announcement",
             replace_existing=True,
         )
