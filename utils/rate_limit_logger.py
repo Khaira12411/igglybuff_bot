@@ -65,15 +65,19 @@ class RateLimitLogger(logging.Handler):
 def setup_rate_limit_logging(bot):
     logger = logging.getLogger("discord.http")
 
-    # Prevent adding multiple handlers
+    # Prevent duplicate handlers
     if any(isinstance(h, RateLimitLogger) for h in logger.handlers):
         return
 
+    # 🦋 Only this custom handler is set to WARNING level
     handler = RateLimitLogger(bot)
-    handler.setLevel(logging.WARNING)  # Catch warnings and above only
+    handler.setLevel(logging.WARNING)
+
     formatter = logging.Formatter("%(asctime)s - %(message)s")
     handler.setFormatter(formatter)
 
-    # Set discord.http level to CRITICAL to suppress debug/info/warning logs
+    # ✅ This suppresses everything else (so no debug/info/clutter)
     logger.setLevel(logging.CRITICAL)
+
+    # Add only our custom rate-limit handler
     logger.addHandler(handler)

@@ -1,3 +1,4 @@
+import asyncio
 import random
 import re
 from typing import Any, Dict
@@ -149,6 +150,8 @@ class EventWatcher(commands.Cog):
             return
 
         try:
+            # 🌸 Add jitter to reduce burst API calls
+            await asyncio.sleep(random.uniform(0.3, 0.7))
             replied_to = (
                 message.reference.resolved
                 or await message.channel.fetch_message(message.reference.message_id)
