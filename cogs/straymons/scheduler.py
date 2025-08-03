@@ -1,3 +1,4 @@
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -28,7 +29,17 @@ class SchedulerCog(commands.Cog):
             replace_existing=True,
         )
 
+        """# 🕑 Add a test tick job every minute to verify scheduler is running
+        self.scheduler.add_job(
+            self.test_tick,
+            "interval",
+            minutes=1,
+            id="test_tick",
+            replace_existing=True,
+        )"""
+
         print("🌸 [SCHEDULER] Daily winner announcement job added! 🌼")
+        print("🕑 [SCHEDULER] Test tick job added (prints every minute).")
 
         # 🩷 Start the scheduler so it can sprinkle daily joy
         self.scheduler.start()
@@ -43,8 +54,15 @@ class SchedulerCog(commands.Cog):
             )
             print(f"🔔 [SCHEDULER] Job ID: {job.id}, Next Run: {next_run}")
 
+    """async def test_tick(self):
+        now = datetime.now(ASIA_MANILA).strftime("%Y-%m-%d %H:%M:%S %Z")
+        print(f"🕑 [SCHEDULER] Test tick fired at {now}")"""
+
     # 💗 The heart of the cog: run the announcement if we're still in the right guild
     async def run_announcement(self):
+        now = datetime.now(ASIA_MANILA).strftime("%Y-%m-%d %H:%M:%S %Z")
+        print(f"🕑 [SCHEDULER] run_announcement triggered at {now}")
+
         guild = self.bot.get_guild(self.guild_id)
         if guild is None:
             # 🌷 Oops! We're not in the guild anymore, skipping today’s shine
