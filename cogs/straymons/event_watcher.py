@@ -7,7 +7,8 @@ from zoneinfo import ZoneInfo
 import discord
 from discord.ext import commands
 
-from cogs.straymons.promo_refresher import promo_cache  # 🎀 Import existing promo cache
+from cogs.straymons.promo_refresher import \
+    promo_cache  # 🎀 Import existing promo cache
 from config.guild_ids import *
 from config.straymons.constants import *
 from config.straymons.emojis import Emojis
@@ -143,10 +144,9 @@ class EventWatcher(commands.Cog):
     async def process_hershey_drops(
         self, message: discord.Message, promo: Dict[str, Any]
     ):
-        if message.guild.id != STRAYMONS_GUILD_ID:
+        if not message.guild or message.guild.id != STRAYMONS_GUILD_ID:
             return
-
-        if not message.guild or not message.reference:
+        if not message.reference:
             return
 
         # 🌸 Add jitter to reduce burst API calls
@@ -168,7 +168,6 @@ class EventWatcher(commands.Cog):
 
         if not is_mew and now - self.last_fetch_ts < 1.0:
             print(f"⏳ [SKIP] Plushie drop check skipped due to cooldown")
-
             return  # silently skip to avoid 429
 
         self.last_fetch_ts = now
@@ -180,7 +179,6 @@ class EventWatcher(commands.Cog):
                 replied_to = await message.channel.fetch_message(
                     message.reference.message_id
                 )
-
         except discord.HTTPException as e:
             if e.status == 429:
                 print(
@@ -207,6 +205,8 @@ class EventWatcher(commands.Cog):
             embed_color = embed.color.value if embed.color else None
 
             drop_type = None
+            caught_pokemon = ""  # Initialize safely outside conditional
+
             if "you caught a" in description:
                 promo_emoji = promo["emoji"]
                 promo_name = promo["name"]
@@ -220,46 +220,47 @@ class EventWatcher(commands.Cog):
                     # Check if description contains "**mew**" or "**shiny mew**" (case insensitive)
                     if "**mew**" in description or "**shiny mew**" in description:
                         caught_pokemon = "mew"
-                    else:
-                        caught_pokemon = ""
 
-                # 🔥 Force drop if it's Mew
-                if caught_pokemon == "mew":
-                    roll = 1
-                    print(f"🌟 [FORCE DROP] {member.display_name} caught a Mew!")
-                    drop_type = "mew"
-                    drop_msg = (
-                        f"{Emojis.pink_sparkle} {member.mention} has caught a Mew! "
-                        f"Oh? It looks like it dropped a **{promo_emoji_name}** {promo_emoji} {Emojis.pink_heart_movin}"
-                    )
-                else:
-                    roll = random.randint(1, rate)
+            # 🔥 Force drop if it's Mew
+            if caught_pokemon == "mew":
+                roll = 1
+                drop_type = "mew"
+                drop_msg = (
+                    f"{Emojis.pink_sparkle} {member.mention} has caught a Mew! "
+                    f"Oh? It looks like it dropped a **{promo_emoji_name}** {promo_emoji} {Emojis.pink_heart_movin}"
+                )
+                drop_msg_logs = (
+                    f"{member.display_name} caught a Mew and got a forced drop!"
+                )
+                print(f"🌟 [FORCE DROP] {drop_msg_logs}")
+            else:
+                roll = random.randint(1, rate)
 
-                if roll == 1:
-                    # 🛡 Don’t overwrite custom Mew message
-                    if caught_pokemon != "mew":
-                        drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} while {drop_type}ing! {Emojis.pink_heart_movin}"
-                        drop_msg_logs = f"{member.display_name} has discovered a **{promo_emoji_name}** while {drop_type}ing!"
-
+            if roll == 1:
+                # 🛡 Don’t overwrite custom Mew message
+                if caught_pokemon != "mew":
+                    drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} while {drop_type}ing! {Emojis.pink_heart_movin}"
+                    drop_msg_logs = f"{member.display_name} has discovered a **{promo_emoji_name}** while {drop_type}ing!"
                     print(f"🎉 {drop_msg_logs}")
 
-                    drop_message = await message.channel.send(drop_msg)
-                    drop_message_id = drop_message.id
-                    msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
+                # Send drop message and track
+                drop_message = await message.channel.send(drop_msg)
+                drop_message_id = drop_message.id
+                msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
 
-                    await record_item_drop(self.bot, member.id, drop_type)
-                    hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
+                await record_item_drop(self.bot, member.id, drop_type)
+                hunt_channel = message.guild.get_channel(HUNT_CHANNEL_ID)
 
-                    drop_track_embed = await build_drop_track_embed(
-                        bot=self.bot,
-                        member=member,
-                        method=drop_type,
-                        promo_emoji=promo_emoji,
-                        promo_emoji_name=promo_emoji_name,
-                        promo_name=promo_name,
-                        msg_link=msg_link,
-                    )
-                    await hunt_channel.send(embed=drop_track_embed)
+                drop_track_embed = await build_drop_track_embed(
+                    bot=self.bot,
+                    member=member,
+                    method=drop_type,
+                    promo_emoji=promo_emoji,
+                    promo_emoji_name=promo_emoji_name,
+                    promo_name=promo_name,
+                    msg_link=msg_link,
+                )
+                await hunt_channel.send(embed=drop_track_embed)
 
     # 🎀 Discord event listener for new messages
     @commands.Cog.listener()
