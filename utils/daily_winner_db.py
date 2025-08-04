@@ -17,17 +17,16 @@ async def set_daily_winner(
     total_drops: int,
     winner_date: Optional[date] = None,
 ):
-    """💖 Insert or update the daily winner for a given date (default: today)."""
+    """💖 Insert or update the daily winner (ties allowed)."""
     if winner_date is None:
         winner_date = date.today()
 
     async with bot.pg_pool.acquire() as conn:
         await conn.execute(
             """
-            INSERT INTO daily_item_winners (winner_date, user_id, total_drops)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (winner_date) DO UPDATE SET
-                user_id = EXCLUDED.user_id,
+            INSERT INTO daily_item_winners (winner_date, user_id, total_drops, recorded_at)
+            VALUES ($1, $2, $3, NOW())
+            ON CONFLICT (winner_date, user_id) DO UPDATE SET
                 total_drops = EXCLUDED.total_drops,
                 recorded_at = NOW()
             """,
