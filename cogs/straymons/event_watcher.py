@@ -184,13 +184,14 @@ class EventWatcher(commands.Cog):
                 else:
                     drop_type = "catch"
                     rate = promo["catch_rate"]
-
-                description_clean = description.lower().replace("**", "")
-
-                caught_match = re.search(
-                    r"you caught a\s+(?::\w+:)?\s*(shiny )?(\w+)", description_clean
-                )
-                caught_pokemon = caught_match.group(2).lower() if caught_match else ""
+                    # Check if description contains "**mew**" or "**shiny mew**" (case insensitive)
+                    if (
+                        "**mew**" in description.lower()
+                        or "**shiny mew**" in description.lower()
+                    ):
+                        caught_pokemon = "mew"
+                    else:
+                        caught_pokemon = ""
 
                 # Debug output
                 # print(f"[DEBUG] Cleaned description: {description_clean}")
