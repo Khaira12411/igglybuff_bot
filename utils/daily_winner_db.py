@@ -98,38 +98,32 @@ def get_12pm_day_ranges(
 # ————————————————————————————————
 # 💖 Get top daily drops for a specific day in Asia/Manila timezone
 # ————————————————————————————————
-async def get_top_daily_drops(bot) -> Optional[Tuple[int, int]]:
+async def get_top_daily_drops(bot) -> List[Tuple[int, int]]:
     """
-    💖 Get the top daily dropper (user_id, drops_count), breaking ties by earliest drop.
-    Returns None if no drops are found.
+    💖 Retrieve (user_id, drops_count) for the current day based on current_day.day_number.
     """
     async with bot.pg_pool.acquire() as conn:
-        # Step 1: Get the current day number
+        # Get the current day number
         current_day_row = await conn.fetchrow(
             "SELECT day_number FROM current_day LIMIT 1;"
         )
         if not current_day_row:
-            return None
+            return []
 
         day_number = current_day_row["day_number"]
 
-        # Step 2: Get drop counts + earliest drop time for each user
-        row = await conn.fetchrow(
+        # Query drops for the current day
+        rows = await conn.fetch(
             """
-            SELECT user_id, COUNT(*) AS drops_count, MIN(created_at) AS first_drop_time
+            SELECT user_id, COUNT(*) AS drops_count
             FROM member_item_drops
             WHERE day = $1
             GROUP BY user_id
-            ORDER BY drops_count DESC, first_drop_time ASC
-            LIMIT 1;
+            ORDER BY drops_count DESC;
             """,
             day_number,
         )
-
-        if not row:
-            return None
-
-        return row["user_id"], row["drops_count"]
+        return [(r["user_id"], r["drops_count"]) for r in rows]
 
 
 # ————————————————————————————————
