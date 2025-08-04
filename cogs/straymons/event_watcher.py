@@ -149,15 +149,49 @@ class EventWatcher(commands.Cog):
         if not message.guild or not message.reference:
             return
 
+        # 🌸 Add jitter to reduce burst API calls
+        await asyncio.sleep(random.uniform(0.6, 1.2))
+
+        now = asyncio.get_event_loop().time()
+
+        # Check if embed description contains Mew for bypass
+        description = ""
+        if message.embeds:
+            embed = message.embeds[0]
+            description = embed.description.lower() if embed.description else ""
+
+        is_mew = "**mew**" in description or "**shiny mew**" in description
+
+        # Soft cooldown: skip fetch if less than 1s since last fetch and not Mew
+        if not hasattr(self, "last_fetch_ts"):
+            self.last_fetch_ts = 0.0  # initialize once
+
+        if not is_mew and now - self.last_fetch_ts < 1.0:
+            print(f"⏳ [SKIP] Plushie drop check skipped due to cooldown")
+
+            return  # silently skip to avoid 429
+
+        self.last_fetch_ts = now
+
         try:
-            # 🌸 Add jitter to reduce burst API calls
-            await asyncio.sleep(random.uniform(0.3, 0.7))
-            replied_to = (
-                message.reference.resolved
-                or await message.channel.fetch_message(message.reference.message_id)
-            )
+            # 🧵 Try resolved first, else fetch with fallback
+            replied_to = message.reference.resolved
+            if not replied_to:
+                replied_to = await message.channel.fetch_message(
+                    message.reference.message_id
+                )
+
+        except discord.HTTPException as e:
+            if e.status == 429:
+                print(
+                    f"⏳ [WAIT] [HERSHEY] Rate limited when fetching reply! Backing off... (429)"
+                )
+                await asyncio.sleep(2.5)
+            else:
+                print(f"❌ [ERROR] [HERSHEY] Failed to fetch referenced message: {e}")
+            return
         except Exception as e:
-            print(f"❌ [ERROR] Failed to resolve referenced message: {e}")
+            print(f"❌ [ERROR] [HERSHEY] Unexpected error: {e}")
             return
 
         member = message.guild.get_member(replied_to.author.id)
@@ -165,7 +199,6 @@ class EventWatcher(commands.Cog):
             return
 
         if member.id not in self.whitelisted_members:
-
             return
 
         if message.embeds:
@@ -185,17 +218,10 @@ class EventWatcher(commands.Cog):
                     drop_type = "catch"
                     rate = promo["catch_rate"]
                     # Check if description contains "**mew**" or "**shiny mew**" (case insensitive)
-                    if (
-                        "**mew**" in description.lower()
-                        or "**shiny mew**" in description.lower()
-                    ):
+                    if "**mew**" in description or "**shiny mew**" in description:
                         caught_pokemon = "mew"
                     else:
                         caught_pokemon = ""
-
-                # Debug output
-                # print(f"[DEBUG] Cleaned description: {description_clean}")
-                # print(f"[DEBUG] Matched Pokémon: {caught_pokemon}")
 
                 # 🔥 Force drop if it's Mew
                 if caught_pokemon == "mew":
@@ -206,11 +232,8 @@ class EventWatcher(commands.Cog):
                         f"{Emojis.pink_sparkle} {member.mention} has caught a Mew! "
                         f"Oh? It looks like it dropped a **{promo_emoji_name}** {promo_emoji} {Emojis.pink_heart_movin}"
                     )
-
                 else:
                     roll = random.randint(1, rate)
-
-                # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
 
                 if roll == 1:
                     # 🛡 Don’t overwrite custom Mew message
