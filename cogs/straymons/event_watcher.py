@@ -7,8 +7,7 @@ from zoneinfo import ZoneInfo
 import discord
 from discord.ext import commands
 
-from cogs.straymons.promo_refresher import \
-    promo_cache  # 🎀 Import existing promo cache
+from cogs.straymons.promo_refresher import promo_cache  # 🎀 Import existing promo cache
 from config.guild_ids import *
 from config.straymons.constants import *
 from config.straymons.emojis import Emojis
@@ -167,7 +166,7 @@ class EventWatcher(commands.Cog):
             self.last_fetch_ts = 0.0  # initialize once
 
         if not is_mew and now - self.last_fetch_ts < 1.0:
-            print(f"⏳ [SKIP] Plushie drop check skipped due to cooldown")
+            # print(f"⏳ [SKIP] Plushie drop check skipped due to cooldown")
             return  # silently skip to avoid 429
 
         self.last_fetch_ts = now
