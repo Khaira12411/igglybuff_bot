@@ -1,3 +1,5 @@
+from datetime import timedelta  # Added for date range calculation
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -58,8 +60,9 @@ class DailyWinnersCog(commands.Cog):
         # 🩷 Add fields: one field per day with all winners that day 🩷
         day_number = 1
         for day, winners_list in winners_by_day.items():
-            day_str = day.strftime("%Y-%m-%d")
-            field_name = f"🌺 Day {day_number} | {day_str}"
+            day_start = day
+            day_end = day_start + timedelta(days=1)
+            field_name = f"🌺 Day {day_number} | {day_start.strftime('%Y-%m-%d')} to {day_end.strftime('%Y-%m-%d')}"
 
             # If there's more than one winner, format with "Winners:" and list
             if len(winners_list) > 1:

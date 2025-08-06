@@ -150,11 +150,9 @@ async def announce_daily_winner(bot: discord.Client):
         iggly_log("sent", "Announcement sent successfully.", label="DailyWinner")
 
         await increment_day_number(bot)
-        iggly_log(
-            "db", f"Rolled over to Day {current_day_number + 1}.", label="DailyWinner"
-        )
+        new_day = await get_current_day_number(bot=bot)
+        iggly_log("db", f"Rolled over to Day {new_day}.", label="DailyWinner")
 
-        new_day = current_day_number + 1
         hunt_channel = bot.get_channel(HUNT_CHANNEL_ID)
         content = f"# ────────────── ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ NEW {new_day} ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ ──────────────"
         await hunt_channel.send(content=content)
