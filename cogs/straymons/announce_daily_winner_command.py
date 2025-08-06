@@ -32,11 +32,13 @@ class AnnounceDailyWinner(commands.Cog):
 
     @app_commands.command(
         name="announce-daily-winner",
-        description="Manually announce daily winner by day number",
+        description="Manually announce daily winner(s) by day number",
     )
     @app_commands.guilds(discord.Object(id=STRAYMONS_GUILD_ID))
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(day="Day number to announce winner for (e.g., 1, 2, 3...)")
+    @app_commands.describe(
+        day="Day number to announce winner(s) for (e.g., 1, 2, 3...)"
+    )
     async def announce_daily_winner(self, interaction: discord.Interaction, day: int):
         await interaction.response.defer(ephemeral=True)
 
@@ -50,7 +52,7 @@ class AnnounceDailyWinner(commands.Cog):
         exists = await check_daily_winner_exists_for_day(self.bot, day_start.date())
         if exists:
             await interaction.followup.send(
-                f"⚠️ Winner for Day {day} has already been announced."
+                f"⚠️ Winner(s) for Day {day} have already been announced."
             )
             return
 
@@ -61,40 +63,25 @@ class AnnounceDailyWinner(commands.Cog):
 
         BLOCKED_WINNER_IDS = {1093841434525827142}  # adjust if needed
 
-        winner_id = None
-        drops_count = None
-
+        winners = []
         for user_id, count in top_drops:
             if user_id in BLOCKED_WINNER_IDS:
                 continue
             wins = await get_daily_winner_count(self.bot, user_id)
             if wins >= 2:
                 continue  # Skip users with 2 or more wins already
-            winner_id = user_id
-            drops_count = count
-            break
+            winners.append((user_id, count))
 
-        if winner_id is None:
+        if not winners:
             await interaction.followup.send(
-                "❌ No eligible winner found for this day (all winners have 2+ wins)."
+                "❌ No eligible winners found for this day (all have 2+ wins)."
             )
             return
-
-        await set_daily_winner(
-            self.bot, winner_id, drops_count, winner_date=day_start.date()
-        )
 
         guild = self.bot.get_guild(STRAYMONS_GUILD_ID)  # Replace with your guild ID
         if guild is None:
             await interaction.followup.send("❌ Could not find the guild.")
             return
-
-        member = guild.get_member(winner_id) or await guild.fetch_member(winner_id)
-        if member is None:
-            await interaction.followup.send("❌ Winner not found in the guild.")
-            return
-
-        wins_so_far = await get_daily_winner_count(self.bot, winner_id)
 
         promo_data = get_active_promo_cache()
         promo_name = promo_data["name"]
@@ -104,43 +91,62 @@ class AnnounceDailyWinner(commands.Cog):
         image_url = promo_data["image_url"]
 
         sga_winner_role = guild.get_role(SGA_WINNER_ROLE_ID)  # No await here
-        if sga_winner_role is not None:
-            await member.add_roles(sga_winner_role)
 
-        winner_mention = f"<@{winner_id}>"
-        desc = f"""## {Emojis.pink_party} Winner for Day {day}!
+        winner_lines = []
+        for user_id, drops_count in winners:
+            await set_daily_winner(
+                self.bot, user_id, drops_count, winner_date=day_start.date()
+            )
+
+            member = guild.get_member(user_id) or await guild.fetch_member(user_id)
+            if member is None:
+                winner_lines.append(
+                    f"- Unknown user ID {user_id} with {drops_count} drops"
+                )
+                continue
+
+            if sga_winner_role is not None:
+                await member.add_roles(sga_winner_role)
+
+            wins_so_far = await get_daily_winner_count(self.bot, user_id)
+            winner_mention = f"<@{user_id}>"
+            winner_lines.append(
+                f"- {winner_mention} with **{drops_count}** {emoji_name} {emoji} (Total wins: {wins_so_far})"
+            )
+
+        desc = f"""## {Emojis.pink_party} Winner(s) for Day {day}!
 - {Emojis.pink_bullet} Event Name: {promo_name}
-- {Emojis.pink_bullet} Winner: {winner_mention}
-- {Emojis.pink_bullet} Total Drops: **{drops_count}** {emoji_name} {emoji}
 - {Emojis.pink_bullet} Prize: {prize}
-- {Emojis.pink_bullet} Total Number of Wins: {wins_so_far}
+
+### Winners:
+{chr(10).join(winner_lines)}
 
 {Emojis.pink_paper} Notes:
-- "Please make a ticket in <#{1297255751353372825}> to claim your prize."""
+- "Please make a ticket in <#{1297255751353372825}> to claim your prize."
+"""
 
         embed = discord.Embed(
             description=desc,
             color=get_random_pink(),
         )
         embed.set_image(url=image_url)
-        embed.set_thumbnail(url=member.display_avatar.url)
 
         news_channel = self.bot.get_channel(EVENT_NEWS_ID)
         if news_channel:
             await news_channel.send(
-                content=f"Congratulations {winner_mention}, you've won a {prize}!",
+                content=f"🎉 Congratulations to the winner(s) of Day {day}!",
                 embed=embed,
             )
 
         logs_channel = self.bot.get_channel(REPORTS_CHANNEL_ID)
         if logs_channel:
             await logs_channel.send(
-                f"📢 Announced daily winner for Day {day}: {member.display_name} ({winner_id}) with {drops_count} drops.",
+                f"📢 Announced daily winner(s) for Day {day}.",
                 embed=embed,
             )
 
         await interaction.followup.send(
-            f"✅ Winner for Day {day} announced successfully."
+            f"✅ Winner(s) for Day {day} announced successfully."
         )
 
 
