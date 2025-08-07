@@ -12,6 +12,7 @@ from utils.daily_winner_db import (
     check_daily_winner_exists_for_day,
     get_daily_winner_count,
     get_top_daily_drops,
+    get_total_plushie_drops_by_user,
     set_daily_winner,
 )
 from utils.visuals.random_pink import get_random_pink
@@ -64,6 +65,8 @@ class AnnounceDailyWinner(commands.Cog):
         BLOCKED_WINNER_IDS = {1093841434525827142}  # adjust if needed
 
         winners = []
+        plushie_rewards = []  # fixed variable name
+
         for user_id, count in top_drops:
             if user_id in BLOCKED_WINNER_IDS:
                 continue
@@ -93,6 +96,8 @@ class AnnounceDailyWinner(commands.Cog):
         sga_winner_role = guild.get_role(SGA_WINNER_ROLE_ID)  # No await here
 
         winner_lines = []
+        plushie_lines = []
+
         for user_id, drops_count in winners:
             await set_daily_winner(
                 self.bot, user_id, drops_count, winner_date=day_start.date()
@@ -114,13 +119,39 @@ class AnnounceDailyWinner(commands.Cog):
                 f"- {winner_mention} with **{drops_count}** {emoji_name} {emoji} (Total wins: {wins_so_far})"
             )
 
+        all_users = list({uid for uid, _ in top_drops})
+        for user_id in all_users:
+            if user_id in BLOCKED_WINNER_IDS:
+                continue
+            plushies = await get_total_plushie_drops_by_user(self.bot, user_id)
+            if plushies >= 5:
+                member = guild.get_member(user_id) or await guild.fetch_member(user_id)
+                wins = await get_daily_winner_count(self.bot, user_id)
+                reward = f"{POKECOIN_EMOJI} 100K" if wins >= 2 else prize
+                plushie_rewards.append(
+                    (user_id, plushies, wins, reward)
+                )  # use plushies count here
+
+        for uid, plushie_count, wins, reward in plushie_rewards:
+            plushie_lines.append(
+                f"- <@{uid}> got **{plushie_count} plushies** (Wins: {wins}) → {reward}"
+            )
+
         desc = f"""## {Emojis.pink_party} Winner(s) for Day {day}!
 - {Emojis.pink_bullet} Event Name: {promo_name}
 - {Emojis.pink_bullet} Prize: {prize}
 
 ### Winners:
 {chr(10).join(winner_lines)}
+"""
 
+        if plushie_lines:
+            desc += f"""
+### {Emojis.pink_trophy} Daily Plushie Rewards:
+{chr(10).join(plushie_lines)}
+"""
+
+        desc += f"""
 {Emojis.pink_paper} Notes:
 - "Please make a ticket in <#{1297255751353372825}> to claim your prize."
 """

@@ -5,7 +5,8 @@ from zoneinfo import ZoneInfo
 import discord
 
 from cogs.straymons.promo_refresher import get_active_promo_cache
-from config.straymons.constants import HUNT_CHANNEL_ID
+from config.straymons.constants import HUNT_CHANNEL_ID, POKECOIN_EMOJI
+from config.straymons.dividers import DividerImages
 from config.straymons.emojis import Emojis
 from utils.daily_winner_db import *
 from utils.time import *
@@ -20,6 +21,9 @@ from config.straymons.constants import *
 from utils.visuals.random_pink import get_random_pink
 
 START_DATE = datetime(2025, 8, 1, 12, 0, 0, tzinfo=ASIA_MANILA)  # Event start date
+prize_1 = f"{Emojis.golden} Gardevoir + 10M {Emojis.pokecoin}"
+prize_2 = f"{Emojis.golden} Diancie + 5M {Emojis.pokecoin}"
+prize_3 = f"{Emojis.golden} Keldeo + 2.5M {Emojis.pokecoin}"
 
 
 async def announce_daily_winner(bot: discord.Client):
@@ -33,11 +37,83 @@ async def announce_daily_winner(bot: discord.Client):
         f"Current datetime: {now.isoformat()}\nCalculated current_day_number: {current_day_number}",
         label="DailyWinner",
     )
+    promo_data = get_active_promo_cache()
 
     try:
+        #
         if current_day_number > 12:
-            # (Unchanged - final top 3 announcement block)
-            # ... your existing final top 3 logic ...
+            top_finalists = await get_top_drops_in_range(bot=bot, days=12)
+
+            if not top_finalists:
+                iggly_log(
+                    "skip", "No top drops found for final winners.", label="DailyWinner"
+                )
+                return
+
+            channel = bot.get_channel(EVENT_NEWS_ID)
+            if not channel:
+                iggly_log(
+                    "critical",
+                    "Announcement channel not found.",
+                    label="DailyWinner",
+                    bot=bot,
+                )
+                return
+
+            guild = channel.guild
+            sga_winner_role = guild.get_role(SGA_WINNER_ROLE_ID)
+
+            final_announcement = f"""## {Emojis.pink_star} Final Winners for **{promo_data['name']}**!
+{Emojis.pink_bullet} Total range: Last 12 days
+{Emojis.pink_bullet} Top 3 plushie droppers:
+"""
+
+            for idx, (user_id, total) in enumerate(top_finalists, start=1):
+                prize = {
+                    1: f"🏆 1st Prize: {prize_1}",
+                    2: f"🥈 2nd Prize: {prize_2}",
+                    3: f"🥉 3rd Prize: {prize_3}",
+                }.get(idx, "🎁 Participation Prize")
+
+                member = guild.get_member(user_id) or await guild.fetch_member(user_id)
+                if member and sga_winner_role:
+                    await member.add_roles(sga_winner_role)
+                    iggly_log(
+                        "sent",
+                        f"SGA Winner role given to {user_id}",
+                        label="FinalWinners",
+                    )
+
+                    try:
+                        await member.send(
+                            f"🎉 Congrats! You placed **#{idx}** in the **{promo_data['name']}** event!\n"
+                            f"You won: {prize}\n\nPlease make a ticket in <#{1297255751353372825}> to claim your reward!"
+                        )
+                        iggly_log(
+                            "dm",
+                            f"Sent DM to {user_id} (Rank {idx})",
+                            label="FinalWinners",
+                        )
+                    except Exception as e:
+                        iggly_log(
+                            "error",
+                            f"Failed to DM user {user_id}: {e}",
+                            label="FinalWinners",
+                        )
+
+                final_announcement += (
+                    f"- <@{user_id}> with **{total} plushies** → {prize}\n"
+                )
+
+            embed = discord.Embed(
+                title=f"🎉 Final Top 3 Winners — {promo_data['name']}!",
+                description=final_announcement,
+                color=get_random_pink(),
+            )
+            embed.set_image(url=DividerImages.Pink_Clouds)
+            await channel.send(embed=embed)
+            iggly_log("sent", "Final winners announcement sent.", label="FinalWinners")
+
             return
 
         # Event ongoing, announce daily winner(s)
@@ -56,34 +132,18 @@ async def announce_daily_winner(bot: discord.Client):
             return
 
         iggly_log("db", f"Top drops fetched: {top_drops}", label="DailyWinner")
-        promo_data = get_active_promo_cache()
         iggly_log("db", f"Promo data fetched: {promo_data}", label="DailyWinner")
+        prize = promo_data["prize"]
 
-        # --- Start multi-winner support ---
-        highest_count = top_drops[0][1]  # Highest drop count from the top user
-        tied_top_users = [(uid, cnt) for uid, cnt in top_drops if cnt == highest_count]
-
-        eligible_winners = []
-        for user_id, count in tied_top_users:
+        # ✨ Plushie earners block
+        plushie_earners = [(uid, count) for uid, count in top_drops if count >= 5]
+        plushie_rewards = []
+        for user_id, count in plushie_earners:
             if user_id in BLOCKED_WINNER_IDS:
-                iggly_log(
-                    "skip", f"Skipping blocked user {user_id}", label="DailyWinner"
-                )
                 continue
-
             wins = await get_daily_winner_count(bot, user_id)
-            iggly_log(
-                "db", f"User {user_id} has won {wins} times before", label="DailyWinner"
-            )
-
-            if wins < 2:
-                eligible_winners.append((user_id, count))
-
-        if not eligible_winners:
-            iggly_log(
-                "skip", "No eligible winners found. Exiting.", label="DailyWinner"
-            )
-            return
+            reward = f"{POKECOIN_EMOJI} 100K" if wins >= 2 else prize
+            plushie_rewards.append((user_id, count, wins, reward))
 
         channel = bot.get_channel(announcement_channel_id)
         if not channel:
@@ -95,50 +155,53 @@ async def announce_daily_winner(bot: discord.Client):
             )
             return
 
-        guild = channel.guild
-        sga_winner_role = guild.get_role(SGA_WINNER_ROLE_ID)
+        sga_winner_role = channel.guild.get_role(SGA_WINNER_ROLE_ID)
 
         announcement_lines = []
-        for winner_id, drops_count in eligible_winners:
-            # Save winner to DB (won't conflict due to unique constraint on (date,user_id))
-            await set_daily_winner(
-                bot, winner_id, drops_count, winner_date=day_start.date()
-            )
+        for user_id, count, wins, reward in plushie_rewards:
+            await set_daily_winner(bot, user_id, count, winner_date=day_start.date())
             iggly_log(
                 "db",
-                f"Winner {winner_id} recorded for day {current_day_number}",
+                f"Plushie earner {user_id} logged as daily winner",
                 label="DailyWinner",
             )
 
-            # Add role to winner
-            member = guild.get_member(winner_id) or await guild.fetch_member(winner_id)
-            await member.add_roles(sga_winner_role)
-            iggly_log(
-                "sent",
-                f"Role {SGA_WINNER_ROLE_ID} assigned to winner {winner_id}",
-                label="DailyWinner",
-            )
+            if reward != f"{POKECOIN_EMOJI} 100K":
+                member = channel.guild.get_member(
+                    user_id
+                ) or await channel.guild.fetch_member(user_id)
+                if sga_winner_role and member:
+                    await member.add_roles(sga_winner_role)
+                    iggly_log(
+                        "sent",
+                        f"SGA Winner role given to {user_id}",
+                        label="DailyWinner",
+                    )
 
-            winner_mention = f"<@{winner_id}>"
-            wins = await get_daily_winner_count(
-                bot, winner_id
-            )  # Updated count after adding today’s win
             announcement_lines.append(
-                f"{winner_mention} with **{drops_count}** {promo_data['emoji_name']} {promo_data['emoji']} (Total wins: {wins})"
+                f"<@{user_id}> with **{count}** plushies {promo_data['emoji']} (Wins: {wins})"
             )
 
         # Send combined announcement for all winners
         desc = f"""## {Emojis.pink_party} Winner(s) for Day {current_day_number}!
-- {Emojis.pink_bullet} Event Name: {promo_data['name']}
-- {Emojis.pink_bullet} Prize: {promo_data['prize']}
+{Emojis.pink_bullet} Event Name: {promo_data['name']}
+{Emojis.pink_bullet} Prize: {promo_data['prize']}
 
 {Emojis.pink_bullet} Congratulations to:
 """
         desc += "\n".join(f"- {line}" for line in announcement_lines)
+
+        if plushie_rewards:
+            desc += f"\n\n{Emojis.pink_gift} **Daily Plushie Rewards:**\n"
+            for uid, count, wins, reward in plushie_rewards:
+                desc += (
+                    f"- <@{uid}> got **{count} plushies** (Wins: {wins}) → {reward}\n"
+                )
+
         desc += f"""
 
 {Emojis.pink_paper} Notes:
-- "Please make a ticket in <#{1297255751353372825}> to claim your prize."
+- \"Please make a ticket in <#{1297255751353372825}> to claim your prize.\"
 """
         embed = discord.Embed(
             title=f"🎉 Daily {promo_data['name']} Winner(s) for Day {current_day_number}!",
@@ -154,7 +217,7 @@ async def announce_daily_winner(bot: discord.Client):
         iggly_log("db", f"Rolled over to Day {new_day}.", label="DailyWinner")
 
         hunt_channel = bot.get_channel(HUNT_CHANNEL_ID)
-        content = f"# ────────────── ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ NEW {new_day} ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ ──────────────"
+        content = f"# ˗ˏˋ ୨💖୧ ˎˊ˗ ⊹🌸⊹ ୨ Day {new_day} ୧ ⊹🌸⊹ ˗ˏˋ ୨💖୧ ˎˊ˗"
         await hunt_channel.send(content=content)
 
     except Exception as e:
