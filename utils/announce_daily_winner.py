@@ -37,7 +37,6 @@ async def announce_daily_winner(bot: discord.Client):
     try:
         if current_day_number > 12:
             # (Unchanged - final top 3 announcement block)
-            # ... your existing final top 3 logic ...
             return
 
         # Event ongoing, announce daily winner(s)
@@ -59,12 +58,19 @@ async def announce_daily_winner(bot: discord.Client):
         promo_data = get_active_promo_cache()
         iggly_log("db", f"Promo data fetched: {promo_data}", label="DailyWinner")
 
-        # --- Start multi-winner support ---
-        highest_count = top_drops[0][1]  # Highest drop count from the top user
+        # --- Start multi-winner support with limited attempts ---
+        highest_count = top_drops[0][1]
         tied_top_users = [(uid, cnt) for uid, cnt in top_drops if cnt == highest_count]
 
         eligible_winners = []
+        max_attempts = 5
+        attempts = 0
+
         for user_id, count in tied_top_users:
+            if attempts >= max_attempts:
+                break
+            attempts += 1
+
             if user_id in BLOCKED_WINNER_IDS:
                 iggly_log(
                     "skip", f"Skipping blocked user {user_id}", label="DailyWinner"
@@ -81,7 +87,9 @@ async def announce_daily_winner(bot: discord.Client):
 
         if not eligible_winners:
             iggly_log(
-                "skip", "No eligible winners found. Exiting.", label="DailyWinner"
+                "skip",
+                "No eligible winners found after 5 attempts.",
+                label="DailyWinner",
             )
             return
 
@@ -100,7 +108,6 @@ async def announce_daily_winner(bot: discord.Client):
 
         announcement_lines = []
         for winner_id, drops_count in eligible_winners:
-            # Save winner to DB (won't conflict due to unique constraint on (date,user_id))
             await set_daily_winner(
                 bot, winner_id, drops_count, winner_date=day_start.date()
             )
@@ -110,7 +117,6 @@ async def announce_daily_winner(bot: discord.Client):
                 label="DailyWinner",
             )
 
-            # Add role to winner
             member = guild.get_member(winner_id) or await guild.fetch_member(winner_id)
             await member.add_roles(sga_winner_role)
             iggly_log(
@@ -120,14 +126,11 @@ async def announce_daily_winner(bot: discord.Client):
             )
 
             winner_mention = f"<@{winner_id}>"
-            wins = await get_daily_winner_count(
-                bot, winner_id
-            )  # Updated count after adding today’s win
+            wins = await get_daily_winner_count(bot, winner_id)
             announcement_lines.append(
                 f"{winner_mention} with **{drops_count}** {promo_data['emoji_name']} {promo_data['emoji']} (Total wins: {wins})"
             )
 
-        # Send combined announcement for all winners
         desc = f"""## {Emojis.pink_party} Winner(s) for Day {current_day_number}!
 - {Emojis.pink_bullet} Event Name: {promo_data['name']}
 - {Emojis.pink_bullet} Prize: {promo_data['prize']}
@@ -138,8 +141,9 @@ async def announce_daily_winner(bot: discord.Client):
         desc += f"""
 
 {Emojis.pink_paper} Notes:
-- "Please make a ticket in <#{1297255751353372825}> to claim your prize."
+- \"Please make a ticket in <#{1297255751353372825}> to claim your prize.\"
 """
+
         embed = discord.Embed(
             title=f"🎉 Daily {promo_data['name']} Winner(s) for Day {current_day_number}!",
             description=desc,
@@ -154,7 +158,7 @@ async def announce_daily_winner(bot: discord.Client):
         iggly_log("db", f"Rolled over to Day {new_day}.", label="DailyWinner")
 
         hunt_channel = bot.get_channel(HUNT_CHANNEL_ID)
-        content = f"# ────────────── ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ NEW {new_day} ˖ ݁𖥔 ݁˖ 🩷 ˖ ݁𖥔 ݁˖ ──────────────"
+        content = f"# ───────────────── ˖ ݑ🕔 ݑ˖ 🦥 ˖ ݑ🕔 ݑ˖ NEW {new_day} ˖ ݑ🕔 ݑ˖ 🦥 ˖ ݑ🕔 ݑ˖ ─────────────────"
         await hunt_channel.send(content=content)
 
     except Exception as e:
