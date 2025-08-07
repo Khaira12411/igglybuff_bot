@@ -137,6 +137,37 @@ async def announce_daily_winner(bot: discord.Client):
 
         # ✨ Plushie earners block
         plushie_earners = [(uid, count) for uid, count in top_drops if count >= 5]
+
+        if not plushie_earners:
+            # Send full drop list since no one qualified
+            channel = bot.get_channel(REPORTS_CHANNEL_ID)
+            staff_msg_content = f"<@110764096298721280>, No plushie winners qualified today (minimum 5 plushies required). Please check the drops."
+            if channel:
+                description = (
+                    "No one qualified for prizes today (minimum 5 plushies).\n\n"
+                )
+                description += "Here are the plushie drops recorded:\n"
+                for uid, count in top_drops:
+                    description += f"- <@{uid}>: {count} plushies\n"
+
+                await channel.send(
+                    content=staff_msg_content,
+                    embed=discord.Embed(
+                        title=f"Daily Plushie Drops — Day {current_day_number}",
+                        description=description,
+                        color=get_random_pink(),
+                    ),
+                )
+            await increment_day_number(bot)
+            new_day = await get_current_day_number(bot=bot)
+            iggly_log("db", f"Rolled over to Day {new_day}.", label="DailyWinner")
+
+            hunt_channel = bot.get_channel(HUNT_CHANNEL_ID)
+            content = f"# ˗ˏˋ ୨💖୧ ˎˊ˗ ⊹🌸⊹ ୨ Day {new_day} ୧ ⊹🌸⊹ ˗ˏˋ ୨💖୧ ˎˊ˗"
+            await hunt_channel.send(content=content)
+
+            return  # Exit early because no winners to process
+
         plushie_rewards = []
         for user_id, count in plushie_earners:
             if user_id in BLOCKED_WINNER_IDS:
