@@ -12,7 +12,6 @@ from utils.daily_winner_db import (
     check_daily_winner_exists_for_day,
     get_daily_winner_count,
     get_top_daily_drops,
-    get_total_plushie_drops_by_user,
     set_daily_winner,
 )
 from utils.visuals.random_pink import get_random_pink
@@ -123,7 +122,8 @@ class AnnounceDailyWinner(commands.Cog):
         for user_id in all_users:
             if user_id in BLOCKED_WINNER_IDS:
                 continue
-            plushies = await get_total_plushie_drops_by_user(self.bot, user_id)
+            plushies = 0
+            # await get_total_plushie_drops_by_user(self.bot, user_id)
             if plushies >= 5:
                 member = guild.get_member(user_id) or await guild.fetch_member(user_id)
                 wins = await get_daily_winner_count(self.bot, user_id)
