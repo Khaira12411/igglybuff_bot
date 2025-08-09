@@ -144,10 +144,8 @@ class EventWatcher(commands.Cog):
         self, message: discord.Message, promo: Dict[str, Any]
     ):
         if not message.guild or message.guild.id != STRAYMONS_GUILD_ID:
-            print("[INFO] Message guild check failed.")
             return
         if not message.reference:
-            print("[INFO] Message has no reference.")
             return
 
         # 🌸 Add jitter to reduce burst API calls
@@ -209,11 +207,9 @@ class EventWatcher(commands.Cog):
 
         member = message.guild.get_member(replied_to.author.id)
         if not member:
-            print("[INFO] Referenced member not found in guild.")
             return
 
         if member.id not in self.whitelisted_members:
-            print(f"[INFO] Member {member.display_name} not in whitelist.")
             return
 
         if message.embeds:
@@ -305,24 +301,18 @@ class EventWatcher(commands.Cog):
     # 🎀 Discord event listener for edited messages
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        print(
-            f"[DEBUG] on_message_edit called for message {after.id} in channel {after.channel.id} by {after.author.id}"
-        )
+
         if not after.guild or after.guild.id != STRAYMONS_GUILD_ID:
-            print("[DEBUG] Guild check failed")
             return
         if after.channel.id not in self.personal_channels.values():
-            print("[DEBUG] Channel not in personal_channels")
             return
         if after.author.id != POKEMEOW_ID:
-            print("[DEBUG] Author ID is not POKEMEOW_ID")
             return
         await self.handle_edit_message(after)
 
     @commands.Cog.listener()
     async def on_ready(self):
         print("🔄 Rebuilding whitelist and personal channel caches...")
-        print("[DEBUG] on_ready triggered")
 
         self.whitelisted_members.clear()
         self.usernames = {}
