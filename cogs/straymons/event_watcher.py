@@ -114,7 +114,7 @@ class EventWatcher(commands.Cog):
         roll = random.randint(1, promo["battle_rate"])
         rate = promo["battle_rate"]
 
-        # print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
+        print(f"🎲 [ROLL] {member.display_name} rolled {roll} (1 out of {rate})")
 
         if roll == 1:
             drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} from battle! {Emojis.pink_heart_movin}"
@@ -139,12 +139,15 @@ class EventWatcher(commands.Cog):
             await hunt_channel.send(embed=drop_track_embed)
 
     # 🎯 Process hershey reply messages to check for fish or catch plushie drops
+
     async def process_hershey_drops(
         self, message: discord.Message, promo: Dict[str, Any]
     ):
         if not message.guild or message.guild.id != STRAYMONS_GUILD_ID:
+            print("[INFO] Message guild check failed.")
             return
         if not message.reference:
+            print("[INFO] Message has no reference.")
             return
 
         # 🌸 Add jitter to reduce burst API calls
@@ -179,6 +182,9 @@ class EventWatcher(commands.Cog):
         if member_id_for_cooldown is not None:
             last_ts = self.last_fetch_per_user.get(member_id_for_cooldown, 0.0)
             if not is_mew and now - last_ts < 1.0:
+                print(
+                    f"[COOLDOWN] Skipping drop for user {member_id_for_cooldown} due to cooldown."
+                )
                 return  # cooldown for this user only
             self.last_fetch_per_user[member_id_for_cooldown] = now
 
@@ -203,9 +209,11 @@ class EventWatcher(commands.Cog):
 
         member = message.guild.get_member(replied_to.author.id)
         if not member:
+            print("[INFO] Referenced member not found in guild.")
             return
 
         if member.id not in self.whitelisted_members:
+            print(f"[INFO] Member {member.display_name} not in whitelist.")
             return
 
         if message.embeds:
@@ -219,6 +227,7 @@ class EventWatcher(commands.Cog):
             # Detect Mew anywhere in the description first
             if "mew" in description:
                 caught_pokemon = "mew"
+                print(f"[DETECT] Mew detected in message for {member.display_name}.")
 
             if "you caught a" in description:
                 promo_emoji = promo["emoji"]
@@ -230,6 +239,9 @@ class EventWatcher(commands.Cog):
                 else:
                     drop_type = "catch"
                     rate = promo["catch_rate"]
+                print(
+                    f"[ROLL] Rolling for drop for {member.display_name} with rate {rate}."
+                )
 
             # 🔥 Force drop if it's Mew
             if caught_pokemon == "mew":
@@ -248,6 +260,9 @@ class EventWatcher(commands.Cog):
                 print(f"🌟 [FORCE DROP] {drop_msg_logs}")
             else:
                 roll = random.randint(1, rate)
+                print(
+                    f"[ROLL RESULT] Rolled {roll} for {member.display_name} (1 means drop)."
+                )
 
             if roll == 1:
                 if caught_pokemon != "mew":
@@ -272,6 +287,8 @@ class EventWatcher(commands.Cog):
                     msg_link=msg_link,
                 )
                 await hunt_channel.send(embed=drop_track_embed)
+            else:
+                print(f"[NO DROP] No drop this roll for {member.display_name}.")
 
     # ————————————————————————————————
     # 🎀 Discord event listener for new messages
@@ -288,19 +305,25 @@ class EventWatcher(commands.Cog):
     # 🎀 Discord event listener for edited messages
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        print(
+            f"[DEBUG] on_message_edit called for message {after.id} in channel {after.channel.id} by {after.author.id}"
+        )
         if not after.guild or after.guild.id != STRAYMONS_GUILD_ID:
+            print("[DEBUG] Guild check failed")
             return
-        # Only listen to messages in personal channels of whitelisted members
         if after.channel.id not in self.personal_channels.values():
+            print("[DEBUG] Channel not in personal_channels")
             return
-
         if after.author.id != POKEMEOW_ID:
+            print("[DEBUG] Author ID is not POKEMEOW_ID")
             return
         await self.handle_edit_message(after)
 
     @commands.Cog.listener()
     async def on_ready(self):
         print("🔄 Rebuilding whitelist and personal channel caches...")
+        print("[DEBUG] on_ready triggered")
+
         self.whitelisted_members.clear()
         self.usernames = {}
         self.personal_channels = {}
