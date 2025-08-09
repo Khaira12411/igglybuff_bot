@@ -55,7 +55,6 @@ class EventWatcher(commands.Cog):
     # 💌 Handle edited messages for hershey drops
     async def handle_edit_message(self, message: discord.Message):
         if not message.guild or message.guild.id != STRAYMONS_GUILD_ID:
-
             return
 
         if message.author.id != POKEMEOW_ID:
@@ -161,18 +160,29 @@ class EventWatcher(commands.Cog):
 
         is_mew = "**mew**" in description or "**shiny mew**" in description
 
-        # Soft cooldown: skip fetch if less than 1s since last fetch and not Mew
-        if not hasattr(self, "last_fetch_ts"):
-            self.last_fetch_ts = 0.0  # initialize once
+        # Soft cooldown: per-user instead of global
+        if not hasattr(self, "last_fetch_per_user"):
+            self.last_fetch_per_user = {}
 
-        if not is_mew and now - self.last_fetch_ts < 1.0:
-            # print(f"⏳ [SKIP] Plushie drop check skipped due to cooldown")
-            return  # silently skip to avoid 429
+        member_id_for_cooldown = None
+        if message.reference and message.reference.resolved:
+            member_id_for_cooldown = message.reference.resolved.author.id
+        elif message.reference:
+            try:
+                ref_msg = await message.channel.fetch_message(
+                    message.reference.message_id
+                )
+                member_id_for_cooldown = ref_msg.author.id
+            except:
+                pass
 
-        self.last_fetch_ts = now
+        if member_id_for_cooldown is not None:
+            last_ts = self.last_fetch_per_user.get(member_id_for_cooldown, 0.0)
+            if not is_mew and now - last_ts < 1.0:
+                return  # cooldown for this user only
+            self.last_fetch_per_user[member_id_for_cooldown] = now
 
         try:
-            # 🧵 Try resolved first, else fetch with fallback
             replied_to = message.reference.resolved
             if not replied_to:
                 replied_to = await message.channel.fetch_message(
@@ -206,6 +216,10 @@ class EventWatcher(commands.Cog):
             drop_type = None
             caught_pokemon = ""  # Initialize safely outside conditional
 
+            # Detect Mew anywhere in the description first
+            if "mew" in description:
+                caught_pokemon = "mew"
+
             if "you caught a" in description:
                 promo_emoji = promo["emoji"]
                 promo_name = promo["name"]
@@ -216,14 +230,14 @@ class EventWatcher(commands.Cog):
                 else:
                     drop_type = "catch"
                     rate = promo["catch_rate"]
-                    # Check if description contains "**mew**" or "**shiny mew**" (case insensitive)
-                    if "**mew**" in description or "**shiny mew**" in description:
-                        caught_pokemon = "mew"
 
             # 🔥 Force drop if it's Mew
             if caught_pokemon == "mew":
                 roll = 1
                 drop_type = "mew"
+                promo_emoji = promo["emoji"]
+                promo_name = promo["name"]
+                promo_emoji_name = promo["emoji_name"]
                 drop_msg = (
                     f"{Emojis.pink_sparkle} {member.mention} has caught a Mew! "
                     f"Oh? It looks like it dropped a **{promo_emoji_name}** {promo_emoji} {Emojis.pink_heart_movin}"
@@ -236,13 +250,11 @@ class EventWatcher(commands.Cog):
                 roll = random.randint(1, rate)
 
             if roll == 1:
-                # 🛡 Don’t overwrite custom Mew message
                 if caught_pokemon != "mew":
                     drop_msg = f"{member.mention} has discovered a **{promo_emoji_name}** {promo_emoji} while {drop_type}ing! {Emojis.pink_heart_movin}"
                     drop_msg_logs = f"{member.display_name} has discovered a **{promo_emoji_name}** while {drop_type}ing!"
                     print(f"🎉 {drop_msg_logs}")
 
-                # Send drop message and track
                 drop_message = await message.channel.send(drop_msg)
                 drop_message_id = drop_message.id
                 msg_link = f"[{Emojis.pink_link} Message Link](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{drop_message_id})"
@@ -261,11 +273,12 @@ class EventWatcher(commands.Cog):
                 )
                 await hunt_channel.send(embed=drop_track_embed)
 
+    # ————————————————————————————————
     # 🎀 Discord event listener for new messages
+    # ————————————————————————————————
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        # Only listen to messages in personal channels of whitelisted
-        if message.guild.id != STRAYMONS_GUILD_ID:
+        if not message.guild or message.guild.id != STRAYMONS_GUILD_ID:
             return
         if message.channel.id not in self.personal_channels.values():
             return
