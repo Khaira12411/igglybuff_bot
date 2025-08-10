@@ -218,12 +218,7 @@ class EventWatcher(commands.Cog):
             embed_color = embed.color.value if embed.color else None
 
             drop_type = None
-            caught_pokemon = ""  # Initialize safely outside conditional
-
-            # Detect Mew anywhere in the description first
-            if "mew" in description:
-                caught_pokemon = "mew"
-                print(f"[DETECT] Mew detected in message for {member.display_name}.")
+            caught_pokemon = ""  # Initialize safely outside conditionals
 
             if "you caught a" in description:
                 promo_emoji = promo["emoji"]

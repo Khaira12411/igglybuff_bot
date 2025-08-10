@@ -29,6 +29,39 @@ async def record_item_drop(
             current_day,
         )
 
+from datetime import datetime
+
+
+async def remove_item_drops(
+    bot,
+    user_id: int,
+    amount: int = 1,
+    drop_time: datetime = None,
+):
+    drop_time = drop_time or datetime.now(tz=ASIA_MANILA)
+
+    async with bot.pg_pool.acquire() as conn:
+        # Get current day from DB
+        row = await conn.fetchrow("SELECT day_number FROM current_day LIMIT 1;")
+        current_day = row["day_number"] if row else 1  # fallback default
+
+        # Delete the specified number of rows for that user and day
+        await conn.execute(
+            """
+            DELETE FROM member_item_drops
+            WHERE ctid IN (
+                SELECT ctid
+                FROM member_item_drops
+                WHERE user_id = $1 AND day = $2
+                ORDER BY drop_time DESC
+                LIMIT $3
+            )
+            """,
+            user_id,
+            current_day,
+            amount,
+        )
+
 
 async def record_manual_item_drop(
     bot,
